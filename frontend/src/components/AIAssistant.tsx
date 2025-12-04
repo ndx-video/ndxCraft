@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Send, Sparkles, Loader2, Check } from 'lucide-react';
-import { generateAsciiDoc, fixGrammar } from '../services/geminiService';
+import { GenerateContent, FixGrammar } from '../../wailsjs/go/main/App';
 
 interface AIAssistantProps {
   isOpen: boolean;
@@ -22,9 +22,10 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose, currentConte
     setIsLoading(true);
     setResult(null);
     try {
-      const generated = await generateAsciiDoc(prompt, currentContent.slice(0, 1000)); 
+      const generated = await GenerateContent(prompt, currentContent.slice(0, 1000));
       setResult(generated);
     } catch (e) {
+      console.error(e);
       setResult("Error generating content. Please check your API key.");
     } finally {
       setIsLoading(false);
@@ -37,10 +38,11 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose, currentConte
     try {
       const textToFix = prompt || currentContent;
       if (!textToFix) return;
-      
-      const fixed = await fixGrammar(textToFix);
+
+      const fixed = await FixGrammar(textToFix);
       setResult(fixed);
     } catch (e) {
+      console.error(e);
       setResult("Error fixing grammar.");
     } finally {
       setIsLoading(false);
@@ -92,7 +94,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose, currentConte
           <div className="mt-4 flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300 border-t border-gray-800 pt-4">
             <div className="flex justify-between items-center">
               <label className="text-[10px] font-bold text-green-500 uppercase tracking-wider">Suggestion</label>
-              <button 
+              <button
                 onClick={() => onApply(result)}
                 className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-900 hover:bg-green-900/50 flex items-center gap-1 transition-colors"
               >
@@ -105,9 +107,9 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose, currentConte
           </div>
         )}
       </div>
-      
+
       <div className="p-2 text-[10px] text-gray-600 text-center border-t border-gray-800">
-         Gemini 2.5 Flash
+        Gemini 2.5 Flash
       </div>
     </div>
   );
