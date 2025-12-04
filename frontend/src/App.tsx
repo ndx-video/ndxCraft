@@ -4,6 +4,7 @@ import Editor from './components/Editor';
 import Preview from './components/Preview';
 import AIAssistant from './components/AIAssistant';
 import LeftSidebar from './components/LeftSidebar';
+import PreferencesModal from './components/PreferencesModal';
 import { EditorMode, LeftTab } from './types';
 import { Sidebar, PanelRight } from 'lucide-react';
 import { ReadFile, SaveFile, SelectFile, SelectSaveFile } from '../wailsjs/go/main/App';
@@ -49,6 +50,7 @@ const App: React.FC = () => {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [activeLeftTab, setActiveLeftTab] = useState<LeftTab>(LeftTab.FILES);
   const [fileName, setFileName] = useState<string>('untitled.adoc');
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
 
   // Focus Modes
   const [focusedPane, setFocusedPane] = useState<'none' | 'editor' | 'preview'>('none');
@@ -160,6 +162,7 @@ const App: React.FC = () => {
         onAIRequest={() => setRightPanelOpen(true)}
         onOpen={handleOpen}
         onSave={handleSave}
+        onSettings={() => setIsPreferencesOpen(true)}
       />
 
       {/* Main Workspace */}
@@ -228,6 +231,11 @@ const App: React.FC = () => {
           </span>
         </div>
       </div>
+
+      <PreferencesModal
+        isOpen={isPreferencesOpen}
+        onClose={() => setIsPreferencesOpen(false)}
+      />
     </div>
   );
 };

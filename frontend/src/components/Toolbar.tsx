@@ -1,7 +1,7 @@
 import React from 'react';
-import { 
-  Bold, Italic, Heading, List, ListOrdered, Link, Image, 
-  Code, Table, Wand2, Eraser, FileText, Download, Upload 
+import {
+  Bold, Italic, Heading, List, ListOrdered, Link, Image,
+  Code, Table, Wand2, Eraser, FileText, Download, Upload, Settings
 } from 'lucide-react';
 
 interface ToolbarProps {
@@ -9,12 +9,13 @@ interface ToolbarProps {
   onAIRequest: () => void;
   onOpen: () => void;
   onSave: () => void;
+  onSettings: () => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave }) => {
-  
+const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave, onSettings }) => {
+
   const Btn = ({ icon: Icon, label, onClick }: { icon: any, label: string, onClick: () => void }) => (
-    <button 
+    <button
       onClick={onClick}
       className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors flex items-center gap-2 group relative"
       title={label}
@@ -47,7 +48,14 @@ const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave
       </div>
 
       <div className="flex items-center gap-2">
-        <button 
+        <button
+          onClick={onSettings}
+          className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+          title="Settings"
+        >
+          <Settings size={20} />
+        </button>
+        <button
           onClick={onAIRequest}
           className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-sm font-medium transition-colors shadow-lg shadow-indigo-500/20"
         >
