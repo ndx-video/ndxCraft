@@ -90,6 +90,38 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ defaultValue, onChange, 
     editorRef.current = editor;
     monacoRef.current = monaco;
 
+    // Define and apply Hack The Box theme
+    monaco.editor.defineTheme('hack-the-box', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: 'D7E4FF46', fontStyle: 'italic' },
+        { token: 'string', foreground: 'C5F467' },
+        { token: 'keyword', foreground: 'FF8484' },
+        { token: 'number', foreground: '5CB2FF' },
+        { token: 'type', foreground: 'FF8484' },
+        { token: 'class', foreground: 'FF8484' },
+        { token: 'function', foreground: 'FFCC5C' },
+        { token: 'variable', foreground: 'A4B1CD' },
+        { token: 'constant', foreground: '5CB2FF' },
+        { token: 'delimiter', foreground: 'A4B1CD' },
+        { token: 'tag', foreground: 'FF8484' },
+        { token: 'attribute.name', foreground: '5CB2FF' },
+        { token: 'attribute.value', foreground: 'C5F467' },
+      ],
+      colors: {
+        'editor.background': '#141d2b',
+        'editor.foreground': '#a4b1cd',
+        'editor.selectionBackground': '#6e7b968C',
+        'editor.lineHighlightBackground': '#1a2332',
+        'editorCursor.foreground': '#9fef00',
+        'editorWhitespace.foreground': '#313f55',
+        'editorIndentGuide.background': '#313f55',
+        'editorIndentGuide.activeBackground': '#a4b1cd',
+      }
+    });
+    monaco.editor.setTheme('hack-the-box');
+
     editor.onDidChangeCursorPosition((e) => {
       if (onCursorChangeRef.current) {
         onCursorChangeRef.current(e.position.lineNumber);
@@ -104,12 +136,12 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ defaultValue, onChange, 
   }, []);
 
   return (
-    <div id="ndx-editor-container" className={`relative h-full w-full bg-[#1e1e1e] transition-all duration-300 border border-transparent focus-within:border-indigo-500 ${isFocused ? 'fixed inset-0 z-50' : ''}`}>
+    <div id="ndx-editor-container" className={`relative h-full w-full bg-[#141d2b] transition-all duration-300 border border-transparent focus-within:border-indigo-500 ${isFocused ? 'fixed inset-0 z-50' : ''}`}>
       {/* Focus Toggle */}
       <button
         id="ndx-editor-focus-toggle"
         onClick={onToggleFocus}
-        className="absolute top-2 right-4 z-10 text-gray-500 hover:text-white bg-gray-800/50 hover:bg-gray-700 p-1.5 rounded transition-colors"
+        className="absolute top-2 right-18 z-10 text-gray-500 hover:text-white bg-gray-800/50 hover:bg-gray-700 p-1.5 rounded transition-colors"
         title={isFocused ? "Exit Focus Mode" : "Focus Source"}
       >
         {isFocused ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
@@ -118,7 +150,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ defaultValue, onChange, 
       <MonacoEditor
         height="100%"
         language="markdown"
-        theme="vs-dark"
+        theme="hack-the-box"
         defaultValue={defaultValue}
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
