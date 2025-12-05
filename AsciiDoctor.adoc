@@ -1,0 +1,66 @@
+= Asciidoctor Integration in ndxCraft
+:toc: macro
+:toc-title:
+:icons: font
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: rouge
+
+This document explains how the https://asciidoctor.org/[Asciidoctor] processor is integrated into ndxCraft to provide real-time rendering, document structure navigation, and visual editing capabilities.
+
+toc::[]
+
+== Overview
+
+ndxCraft utilizes **Asciidoctor.js**, the JavaScript transpilation of the Asciidoctor core (written in Ruby). This allows the application to run the full AsciiDoc processing engine entirely on the client-side (within the React frontend), ensuring fast updates without round-trips to the Go backend.
+
+== Core Components
+
+The integration is primarily handled in two files:
+
+1.  `frontend/src/services/asciidocService.ts`: The service layer that interfaces directly with the Asciidoctor API.
+2.  `frontend/src/components/Preview.tsx`: The UI component that displays the rendered output.
+
+=== 1. The AsciiDoc Service (`asciidocService.ts`)
+
+This service is responsible for initializing the Asciidoctor processor and exposing methods for conversion and parsing.
+
+*   **Initialization**: An instance of `Asciidoctor()` is created when the app loads.
+*   **Extensions**: A custom `treeProcessor` extension is registered. This processor iterates through the parsed document blocks and adds `data-line` attributes (via roles). This is crucial for **Source Mapping**, allowing the editor and preview to scroll in sync.
+*   **HTML Conversion**: The `convertToHtml` function takes the raw AsciiDoc string and converts it to HTML. It supports injecting a "cursor marker" (a hidden span) to help locate the cursor position when switching between code and visual modes.
+*   **AST Parsing**: The `parseAST` function loads the document into an Asciidoctor Document Object Model (DOM) without converting it to HTML. This object tree is traversed to build the **Structure View** (Outline) in the left sidebar, extracting titles, levels, and line numbers.
+
+=== 2. The Preview Component (`Preview.tsx`)
+
+The Preview component renders the generated HTML in an isolated environment.
+
+*   **Iframe Isolation**: The content is rendered inside a sandboxed `<iframe>`. This ensures that the document's styles (which might include user-provided CSS) do not bleed into the application's UI, and vice versa.
+*   **Communication**: The React component communicates with the iframe via the `postMessage` API. It sends:
+    *   `update-content`: The new HTML string to display.
+    *   `update-css`: Custom CSS to inject into the iframe head.
+    *   `set-cursor`: Instructions to scroll the view to a specific position.
+*   **Event Handling**: The iframe captures user interactions (clicks, scrolling, typing) and sends messages back to the parent component.
+
+== Key Features Powered by Asciidoctor
+
+=== Real-time Preview
+As the user types in the Monaco Editor, the content is debounced and sent to `asciidocService.convertToHtml`. The resulting HTML is instantly pushed to the preview iframe.
+
+=== Synchronized Scrolling
+Because the `treeProcessor` adds line number metadata to the HTML elements, the application can map a cursor position in the source text to a specific DOM element in the preview, and vice versa.
+
+=== Document Structure (AST)
+The "Structure" tab in the sidebar uses the `parseAST` method. By accessing the Asciidoctor DOM directly, we get a semantic understanding of the document hierarchy (Sections, subsections) rather than just regex-matching headers. This allows for a robust and accurate outline view.
+
+=== Visual Editing (Experimental)
+When "Visual Edit" mode is enabled:
+1.  The preview iframe's body is set to `contentEditable="true"`.
+2.  User keystrokes are captured.
+3.  Changes are sent back to the application.
+4.  *Note*: Currently, this is a destructive operation as it relies on `innerText`, which may strip AsciiDoc formatting. It is intended for quick text edits rather than structural changes.
+
+== Future Improvements
+
+*   **Custom Converters**: Implementing a custom converter could allow for more fine-grained control over the HTML output, specifically for better source mapping without using "roles".
+*   **Bi-directional Sync**: Improving the visual editor to map HTML changes back to AsciiDoc syntax (e.g., converting `<b>` back to `*bold*`) would make the visual editing feature fully robust.
