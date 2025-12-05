@@ -2,9 +2,8 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 env:
-  # Necessary for most wails apps to build correctly
   CGO_ENABLED: 1
 jobs:
   build:
@@ -13,28 +12,56 @@ jobs:
       matrix:
         build: [linux, windows, macos]
         include:
-        - build: linux
-          os: ubuntu-latest
-        - build: windows
-          os: windows-latest
-        - build: macos
-          os: macos-latest
+          - build: linux
+            os: ubuntu-22.04
+            platform: linux/amd64
+          - build: windows
+            os: windows-latest
+            platform: windows/amd64
+          - build: macos
+            os: macos-latest
+            platform: darwin/universal
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Build Wails App
-        uses: dAppServer/wails-build-action@v2.2
-        id: build
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          build-name: ndxCraft
-          build-platform: ${{ matrix.os }}
-          package: false
+          go-version: "1.24"
+          check-latest: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install Linux Dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Build Wails App
+        shell: bash
+        run: |
+          wails build -platform ${{ matrix.platform }}
+
+      # Compress Mac App to zip for release
+      - name: Compress Mac App
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd build/bin
+          zip -r ndxCraft-macos-universal.zip ndxCraft.app
+          rm -rf ndxCraft.app
 
       - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
