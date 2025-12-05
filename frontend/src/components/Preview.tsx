@@ -130,7 +130,30 @@ const Preview: React.FC<PreviewProps> = ({
           window.addEventListener('blur', notifyBlur);
           document.body.addEventListener('focus', notifyFocus);
           document.body.addEventListener('blur', notifyBlur);
-          document.body.addEventListener('click', () => {
+          document.body.addEventListener('click', (e) => {
+             const target = e.target.closest('a');
+             if (target) {
+                 const href = target.getAttribute('href');
+
+                 // Handle External Links
+                 if (href && (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:'))) {
+                     e.preventDefault();
+                     window.parent.postMessage({ type: 'open-browser', url: href }, '*');
+                     return;
+                 }
+
+                 // Handle Internal Anchors (Prevent Hall of Mirrors)
+                 if (target.hash) {
+                    e.preventDefault();
+                    const id = target.hash.substring(1);
+                    const el = document.getElementById(id);
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth' });
+                    }
+                    return;
+                 }
+             }
+
              document.body.focus();
              notifyFocus();
           });

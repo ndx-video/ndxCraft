@@ -418,3 +418,11 @@ func (a *App) UpdateProjectLastOpened(path string) error {
 	}
 	return db.UpdateProjectLastOpened(path)
 }
+
+func (a *App) GetDefaultProjectRoot() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, "docsCraft"), nil
+}

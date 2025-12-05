@@ -18,11 +18,10 @@ interface ToolbarProps {
   onSave: () => void;
   onSettings: () => void;
   onGitHub: () => void;
-  onViewSource: () => void;
   onProjectList: () => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave, onSettings, onGitHub, onViewSource, onProjectList }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave, onSettings, onGitHub, onProjectList }) => {
 
   const Btn = ({ icon: Icon, label, onClick, id }: { icon: any, label: string, onClick: () => void, id?: string }) => (
     <button
@@ -60,15 +59,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          id="ndx-toolbar-view-source"
-          onClick={onViewSource}
-          className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
-          title="View HTML Source"
-          tabIndex={-1}
-        >
-          <Code size={20} />
-        </button>
         <button
           id="ndx-toolbar-github"
           onClick={onGitHub}

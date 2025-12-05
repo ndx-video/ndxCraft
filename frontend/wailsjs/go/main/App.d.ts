@@ -14,6 +14,8 @@ export function GetAllPreferences():Promise<Record<string, any>>;
 
 export function GetAppState(arg1:string):Promise<string>;
 
+export function GetDefaultProjectRoot():Promise<string>;
+
 export function GetFileTree(arg1:string):Promise<Array<main.FileNode>>;
 
 export function GetPreference(arg1:string):Promise<any>;

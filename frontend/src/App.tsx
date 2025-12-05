@@ -8,7 +8,7 @@ import PreferencesModal from './components/PreferencesModal';
 import { EditorMode, LeftTab, FileNode } from './types';
 import { Sidebar, PanelRight, Circle } from 'lucide-react';
 import ProjectListModal from './components/ProjectListModal';
-import { ReadFile, SaveFile, SelectFile, SelectSaveFile, ListFiles, OpenGitHubDesktop, OpenBrowser, SaveShadowFile, GetShadowFile, SaveAppState, GetAppState, HasCorruption, RestoreBackup, SelectCssFile, GetFileTree, ClearShadowFile, UpdateProjectLastOpened } from '../wailsjs/go/main/App';
+import { ReadFile, SaveFile, SelectFile, SelectSaveFile, ListFiles, OpenGitHubDesktop, OpenBrowser, SaveShadowFile, GetShadowFile, SaveAppState, GetAppState, HasCorruption, RestoreBackup, GetFileTree, ClearShadowFile, UpdateProjectLastOpened, GetDefaultProjectRoot, GetPreference, AddProject } from '../wailsjs/go/main/App';
 import { WindowFullscreen, WindowUnfullscreen, WindowIsFullscreen } from '../wailsjs/runtime/runtime';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,14 +79,6 @@ const App: React.FC = () => {
   const [pendingFileToOpen, setPendingFileToOpen] = useState<string | null>(null);
   const [isUnsavedDialogOpen, setIsUnsavedDialogOpen] = useState(false);
 
-  // View Source State
-  const [isViewSourceOpen, setIsViewSourceOpen] = useState(false);
-  const [htmlSource, setHtmlSource] = useState('');
-
-  // Custom CSS State
-  const [cssFilePath, setCssFilePath] = useState<string>('');
-  const [cssContent, setCssContent] = useState<string>('');
-  const [originalCssContent, setOriginalCssContent] = useState<string>('');
 
   useEffect(() => {
     if (projectRoot) {
@@ -98,6 +90,16 @@ const App: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       try {
+        // Load Project Root
+        let root = await GetPreference("projectRoot");
+        if (!root || root === "") {
+          // @ts-ignore
+          root = await GetDefaultProjectRoot();
+        }
+        if (root) {
+          setProjectRoot(root);
+        }
+
         const lastFile = await GetAppState("lastFile");
         if (lastFile && lastFile !== "") {
           console.log("Restoring last file:", lastFile);
@@ -235,6 +237,13 @@ const App: React.FC = () => {
           view: window
         });
         window.dispatchEvent(newEvent);
+      } else if (event.data.type === 'open-browser') {
+        // Handle request to open external link
+        const url = event.data.url;
+        if (url) {
+          // @ts-ignore
+          OpenBrowser(url);
+        }
       }
     };
 
@@ -525,6 +534,38 @@ const App: React.FC = () => {
     try {
       const filePath = await SelectFile();
       if (filePath) {
+        // Check if file is inside current project root
+        const separator = filePath.includes('\\') ? '\\' : '/';
+        const lastSepIndex = filePath.lastIndexOf(separator);
+        const parentDir = filePath.substring(0, lastSepIndex);
+
+        let isInsideProject = false;
+        if (projectRoot && projectRoot !== "") {
+          // Simple prefix check. 
+          // Normalize slashes for comparison if needed, but usually Wails is consistent.
+          isInsideProject = filePath.startsWith(projectRoot);
+        }
+
+        if (!isInsideProject) {
+          const confirmChange = window.confirm(
+            `The selected file is outside the current project structure.\n\n` +
+            `Do you want to set the parent folder as the new Project Root?\n` +
+            `New Root: ${parentDir}`
+          );
+
+          if (confirmChange) {
+            setProjectRoot(parentDir);
+            try {
+              // @ts-ignore
+              await AddProject(parentDir);
+              // @ts-ignore
+              await UpdateProjectLastOpened(parentDir);
+            } catch (e) {
+              console.error("Failed to update project list:", e);
+            }
+          }
+        }
+
         const text = await ReadFile(filePath);
         setContent(text);
         setFileName(filePath);
@@ -684,48 +725,6 @@ const App: React.FC = () => {
     textarea.scrollTop = (line - 5) * lineHeight; // Scroll a bit above
   };
 
-  const handleViewSource = () => {
-    // In a real app, we might want to get the innerHTML of the preview pane specifically.
-    // For now, let's just get the whole document HTML or try to find the preview container.
-    // Better yet, let's try to get the element with class 'preview-content' if it exists, or just body.
-    const previewElement = document.querySelector('.prose'); // Assuming Preview uses 'prose' class
-    if (previewElement) {
-      setHtmlSource(previewElement.outerHTML);
-    } else {
-      setHtmlSource(document.documentElement.outerHTML);
-    }
-    setIsViewSourceOpen(true);
-  };
-
-  const handleBrowseCss = async () => {
-    try {
-      const path = await SelectCssFile();
-      if (path) {
-        const text = await ReadFile(path);
-        setCssFilePath(path);
-        setCssContent(text);
-        setOriginalCssContent(text);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSaveCss = async () => {
-    if (!cssFilePath) return;
-    try {
-      await SaveFile(cssFilePath, cssContent);
-      setOriginalCssContent(cssContent);
-      alert("CSS Saved!");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to save CSS: " + err);
-    }
-  };
-
-  const handleCancelCss = () => {
-    setCssContent(originalCssContent);
-  };
 
   const handleDiscardChanges = async () => {
     if (!isDirty) return;
@@ -827,7 +826,6 @@ const App: React.FC = () => {
           onSave={handleSave}
           onSettings={() => setIsPreferencesOpen(true)}
           onGitHub={handleGitHub}
-          onViewSource={handleViewSource}
           onProjectList={handleProjectList}
         />
       )}
@@ -891,7 +889,6 @@ const App: React.FC = () => {
                   setFocusedPane(focusedPane === 'preview' ? 'none' : 'preview');
                 }
               }}
-              customCss={cssContent}
               cursorOffset={cursorOffset}
               isActive={activeEditor === 'visual'}
               onActivate={() => setActiveEditor('visual')}
@@ -951,75 +948,6 @@ const App: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isViewSourceOpen} onOpenChange={setIsViewSourceOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] h-[90vh] bg-gray-950 border-gray-800 text-gray-100 flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-4 border-b border-gray-800 bg-gray-900/50">
-            <DialogTitle>Source Inspector</DialogTitle>
-            <DialogDescription className="text-gray-400">
-              View HTML source and edit custom CSS.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 flex min-h-0">
-            {/* HTML Source Pane */}
-            <div className="flex-1 flex flex-col border-r border-gray-800 min-w-0">
-              <div className="p-2 bg-gray-900 border-b border-gray-800 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                HTML Source (Read Only)
-              </div>
-              <div className="flex-1 overflow-auto bg-gray-950 p-4 font-mono text-xs text-green-400 whitespace-pre-wrap">
-                {htmlSource}
-              </div>
-            </div>
-
-            {/* CSS Editor Pane */}
-            <div className="flex-1 flex flex-col min-w-0 bg-gray-900/30">
-              <div className="p-2 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Custom CSS</span>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={cssFilePath || "No file selected"}
-                    readOnly
-                    className="h-6 text-[10px] w-48 bg-gray-950 border-gray-700 text-gray-400"
-                  />
-                  <Button onClick={handleBrowseCss} size="sm" variant="outline" className="h-6 text-[10px] px-2 border-gray-700 hover:bg-gray-800">
-                    Browse
-                  </Button>
-                </div>
-              </div>
-              <div className="flex-1 relative">
-                <textarea
-                  className="absolute inset-0 w-full h-full bg-gray-950 p-4 font-mono text-xs text-cyan-300 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500/50 border-none"
-                  value={cssContent}
-                  onChange={(e) => setCssContent(e.target.value)}
-                  placeholder="/* Select a CSS file to edit styles */"
-                  spellCheck={false}
-                />
-              </div>
-              <div className="p-2 border-t border-gray-800 bg-gray-900 flex justify-end gap-2">
-                <Button
-                  onClick={handleCancelCss}
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs text-gray-400 hover:text-white"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveCss}
-                  size="sm"
-                  className="h-7 text-xs bg-indigo-600 hover:bg-indigo-500"
-                >
-                  Save CSS
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="p-4 border-t border-gray-800 bg-gray-900/50">
-            <Button onClick={() => setIsViewSourceOpen(false)}>Close Inspector</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       <ProjectListModal
         isOpen={isProjectListOpen}
         onClose={() => setIsProjectListOpen(false)}

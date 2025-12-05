@@ -26,6 +26,10 @@ export function GetAppState(arg1) {
   return window['go']['main']['App']['GetAppState'](arg1);
 }
 
+export function GetDefaultProjectRoot() {
+  return window['go']['main']['App']['GetDefaultProjectRoot']();
+}
+
 export function GetFileTree(arg1) {
   return window['go']['main']['App']['GetFileTree'](arg1);
 }
