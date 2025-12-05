@@ -1,0 +1,41 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+env:
+  # Necessary for most wails apps to build correctly
+  CGO_ENABLED: 1
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [linux, windows, macos]
+        include:
+        - build: linux
+          os: ubuntu-latest
+        - build: windows
+          os: windows-latest
+        - build: macos
+          os: macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build Wails App
+        uses: dAppServer/wails-build-action@v2.2
+        id: build
+        with:
+          build-name: ndxCraft
+          build-platform: ${{ matrix.os }}
+          package: false
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            build/bin/*
