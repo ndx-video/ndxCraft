@@ -26,3 +26,10 @@ export interface AIState {
   error: string | null;
   suggestion: string | null;
 }
+
+export interface FileNode {
+  name: string;
+  path: string;
+  isDir: boolean;
+  children?: FileNode[];
+}
