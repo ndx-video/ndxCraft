@@ -34,10 +34,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ defaultValue, onChange, 
   const options = React.useMemo(() => ({
     minimap: { enabled: true },
     wordWrap: 'on' as const,
-    lineNumbers: 'on' as const,
+    lineNumbers: 'off' as const,
     scrollBeyondLastLine: false,
     fontSize: 14,
-    fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+    fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace",
     automaticLayout: true,
     padding: { top: 20, bottom: 20 },
   }), []);
