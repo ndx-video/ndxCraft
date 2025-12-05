@@ -1,3 +1,10 @@
+/**
+ * FileTree Component
+ * 
+ * Location: Inside the LeftSidebar (Files tab).
+ * Purpose: Displays the project directory structure recursively. 
+ *          Handles expanding/collapsing folders and selecting files.
+ */
 import React, { useState } from 'react';
 import { FileNode } from '../types';
 import { ChevronRight, ChevronDown, File, Folder } from 'lucide-react';

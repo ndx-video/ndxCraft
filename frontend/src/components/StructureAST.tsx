@@ -1,3 +1,10 @@
+/**
+ * StructureAST Component
+ * 
+ * Location: Inside the LeftSidebar (Structure tab, when "AST" mode is active).
+ * Purpose: Visualizes the Abstract Syntax Tree (AST) of the AsciiDoc document.
+ *          Useful for debugging document structure and understanding parsing.
+ */
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { parseAST, AstNode } from '../services/asciidocService';
@@ -70,7 +77,7 @@ const StructureAST: React.FC<StructureASTProps> = ({ content, onNodeClick }) => 
   }, [content]);
 
   return (
-    <div className="flex flex-col gap-1 p-2">
+    <div id="ndx-structure-ast-container" className="flex flex-col gap-1 p-2">
       <div className="text-[10px] text-indigo-400/80 uppercase font-bold px-2 py-2 tracking-wider flex items-center gap-2">
         <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
         AST View

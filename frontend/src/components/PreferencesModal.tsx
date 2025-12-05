@@ -1,3 +1,10 @@
+/**
+ * PreferencesModal Component
+ * 
+ * Location: Modal dialog (overlay).
+ * Purpose: Allows users to configure application settings such as 
+ *          Project Root, Theme, and other global preferences.
+ */
 import React from 'react';
 import {
   Dialog,
@@ -87,7 +94,7 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] bg-gray-950 border-gray-800 text-gray-100 shadow-2xl shadow-indigo-500/10 backdrop-blur-xl">
-        <DialogHeader>
+        <DialogHeader id="ndx-prefs-header">
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
             Preferences
           </DialogTitle>
@@ -97,17 +104,17 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
         </DialogHeader>
 
         <Tabs defaultValue="general" className="w-full mt-4">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-900/50 p-1">
-            <TabsTrigger value="general" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
+          <TabsList id="ndx-prefs-tabs-list" className="grid w-full grid-cols-4 bg-gray-900/50 p-1">
+            <TabsTrigger id="ndx-prefs-tab-general" value="general" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
               <Monitor className="w-4 h-4 mr-2" /> General
             </TabsTrigger>
-            <TabsTrigger value="editor" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
+            <TabsTrigger id="ndx-prefs-tab-editor" value="editor" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
               <Type className="w-4 h-4 mr-2" /> Editor
             </TabsTrigger>
-            <TabsTrigger value="theme" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
+            <TabsTrigger id="ndx-prefs-tab-theme" value="theme" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
               <Palette className="w-4 h-4 mr-2" /> Theme
             </TabsTrigger>
-            <TabsTrigger value="shortcuts" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
+            <TabsTrigger id="ndx-prefs-tab-shortcuts" value="shortcuts" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
               <Keyboard className="w-4 h-4 mr-2" /> Shortcuts
             </TabsTrigger>
           </TabsList>
@@ -123,6 +130,7 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
                   </div>
                   <div className="flex gap-2">
                     <Input
+                      id="ndx-prefs-project-root"
                       value={projectRoot || "Default (./content)"}
                       readOnly
                       className="bg-gray-900 border-gray-700 text-gray-400 font-mono text-sm"
@@ -138,7 +146,7 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
                     <Label className="text-base font-medium text-gray-200">Auto-Save</Label>
                     <p className="text-sm text-gray-500">Automatically save your work every few minutes.</p>
                   </div>
-                  <Switch checked={autoSave} onCheckedChange={setAutoSave} className="data-[state=checked]:bg-indigo-600" />
+                  <Switch id="ndx-prefs-autosave" checked={autoSave} onCheckedChange={setAutoSave} className="data-[state=checked]:bg-indigo-600" />
                 </div>
 
                 <div className="flex items-center justify-between p-4 rounded-lg bg-gray-900/30 border border-gray-800 hover:border-indigo-500/30 transition-colors">
@@ -146,7 +154,7 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
                     <Label className="text-base font-medium text-gray-200">Spell Check</Label>
                     <p className="text-sm text-gray-500">Highlight spelling errors as you type.</p>
                   </div>
-                  <Switch checked={spellCheck} onCheckedChange={setSpellCheck} className="data-[state=checked]:bg-indigo-600" />
+                  <Switch id="ndx-prefs-spellcheck" checked={spellCheck} onCheckedChange={setSpellCheck} className="data-[state=checked]:bg-indigo-600" />
                 </div>
               </div>
             </TabsContent>
@@ -243,10 +251,10 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
         </Tabs>
 
         <DialogFooter className="mt-6">
-          <Button variant="outline" onClick={onClose} className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white">
+          <Button id="ndx-prefs-cancel-btn" variant="outline" onClick={onClose} className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white">
             Cancel
           </Button>
-          <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20">
+          <Button id="ndx-prefs-save-btn" onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20">
             Save Changes
           </Button>
         </DialogFooter>

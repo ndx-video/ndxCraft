@@ -1,3 +1,9 @@
+/**
+ * UI Primitive: Dialog
+ * 
+ * Location: Reusable component used throughout the app.
+ * Purpose: A modal dialog window that overlays the main content.
+ */
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"

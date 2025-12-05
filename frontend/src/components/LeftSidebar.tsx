@@ -1,3 +1,11 @@
+/**
+ * LeftSidebar Component
+ * 
+ * Location: Left side of the application, collapsible.
+ * Purpose: Serves as the primary navigation hub. It contains two main tabs:
+ *          1. Files: A file tree explorer for the project.
+ *          2. Structure: An outline view of the current document (Blocks or AST mode).
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { Folder, ListTree, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
 import { LeftTab, FileNode } from '../types';
@@ -103,10 +111,10 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   };
 
   return (
-    <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 transition-all duration-300">
+    <div id="ndx-left-sidebar" className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 transition-all duration-300">
       {/* Tabs */}
-      <div className="h-6 flex bg-black border-b border-gray-800">
-        <button
+      <div id="ndx-left-sidebar-tabs" className="h-6 flex bg-black border-b border-gray-800">
+        <button id="ndx-left-sidebar-files-tab"
           onClick={() => onTabChange(LeftTab.FILES)}
           className={`flex-1 flex items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-wider transition-colors ${activeTab === LeftTab.FILES
             ? 'bg-gray-900 text-white border-b-2 border-indigo-500'
@@ -115,7 +123,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
         >
           <Folder size={12} /> Files
         </button>
-        <button
+        <button id="ndx-left-sidebar-outline-tab"
           onClick={() => onTabChange(LeftTab.OUTLINE)}
           className={`flex-1 flex items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-wider transition-colors ${activeTab === LeftTab.OUTLINE
             ? 'bg-gray-900 text-white border-b-2 border-indigo-500'
@@ -127,9 +135,9 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+      <div id="ndx-left-sidebar-content" className="flex-1 overflow-y-auto p-2 custom-scrollbar">
         {activeTab === LeftTab.FILES && (
-          <div className="flex flex-col gap-1">
+          <div id="ndx-left-sidebar-files" className="flex flex-col gap-1">
             <div className="px-2 py-1 text-[10px] uppercase font-bold text-gray-500 mb-1">
               Project Files
             </div>
@@ -142,16 +150,16 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
         )}
 
         {activeTab === LeftTab.OUTLINE && (
-          <div className="flex flex-col gap-2">
+          <div id="ndx-left-sidebar-outline" className="flex flex-col gap-2">
             {/* Improved Toggle UI */}
-            <div className="flex items-center justify-between px-3 py-3 bg-gray-800/30 rounded-lg border border-gray-800 mb-2 mx-1">
+            <div id="ndx-left-sidebar-outline-toggle" className="flex items-center justify-between px-3 py-3 bg-gray-800/30 rounded-lg border border-gray-800 mb-2 mx-1">
               <span className="text-xs font-medium text-gray-400">View Mode</span>
               <div className="flex items-center gap-2">
                 <Label htmlFor="mode-toggle" className={`text-xs font-bold transition-colors ${!useAst ? 'text-indigo-400' : 'text-gray-600'}`}>
                   Blocks
                 </Label>
                 <Switch
-                  id="mode-toggle"
+                  id="ndx-sidebar-mode-toggle"
                   checked={useAst}
                   onCheckedChange={setUseAst}
                   className="data-[state=checked]:bg-indigo-600"
@@ -163,9 +171,9 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
             </div>
 
             {useAst ? (
-              <StructureAST content={content} onNodeClick={onNavigate} />
+              <StructureAST id="ndx-left-sidebar-outline-ast" content={content} onNodeClick={onNavigate} />
             ) : (
-              <div className="px-1">
+              <div id="ndx-left-sidebar-outline-blocks" className="px-1">
                 <p className="text-[10px] text-gray-500 uppercase font-bold px-2 py-1 mb-2">Drag to Reorder Sections</p>
                 <Reorder.Group axis="y" values={items} onReorder={handleReorder} className="flex flex-col gap-1">
                   {items.map((item) => (

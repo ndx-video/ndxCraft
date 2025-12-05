@@ -1,3 +1,10 @@
+/**
+ * AIAssistant Component
+ * 
+ * Location: Floating or Sidebar panel (context dependent).
+ * Purpose: Provides AI-powered assistance, such as chat, code generation, 
+ *          or content analysis.
+ */
 import React, { useState } from 'react';
 import { X, Send, Sparkles, Loader2, Check } from 'lucide-react';
 import { GenerateContent, FixGrammar } from '../../wailsjs/go/main/App';
@@ -50,13 +57,13 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose, currentConte
   };
 
   return (
-    <div className="w-96 bg-gray-900 border-l border-gray-800 flex flex-col shrink-0 h-full">
+    <div id="ndx-ai-assistant-panel" className="w-96 bg-gray-900 border-l border-gray-800 flex flex-col shrink-0 h-full">
       <div className="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-900">
         <h3 className="text-white font-semibold flex items-center gap-2 text-sm">
           <Sparkles className="text-indigo-400" size={16} />
           ndxCraft AI
         </h3>
-        <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+        <button id="ndx-ai-close-btn" onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
           <X size={16} />
         </button>
       </div>
@@ -65,6 +72,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose, currentConte
         <div className="flex flex-col gap-2">
           <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Instructions</label>
           <textarea
+            id="ndx-ai-prompt-input"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe what you want to write..."
@@ -74,6 +82,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose, currentConte
 
         <div className="flex gap-2">
           <button
+            id="ndx-ai-generate-btn"
             onClick={handleGenerate}
             disabled={isLoading || !prompt}
             className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 rounded text-xs font-bold uppercase tracking-wide flex justify-center items-center gap-2"
@@ -82,6 +91,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose, currentConte
             Generate
           </button>
           <button
+            id="ndx-ai-fix-grammar-btn"
             onClick={handleFixGrammar}
             disabled={isLoading}
             className="flex-1 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white py-2 rounded text-xs font-bold uppercase tracking-wide"
@@ -95,13 +105,14 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose, currentConte
             <div className="flex justify-between items-center">
               <label className="text-[10px] font-bold text-green-500 uppercase tracking-wider">Suggestion</label>
               <button
+                id="ndx-ai-insert-btn"
                 onClick={() => onApply(result)}
                 className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-900 hover:bg-green-900/50 flex items-center gap-1 transition-colors"
               >
                 <Check size={12} /> Insert
               </button>
             </div>
-            <div className="bg-black p-3 rounded border border-gray-800 text-xs font-mono text-gray-400 max-h-60 overflow-y-auto whitespace-pre-wrap">
+            <div id="ndx-ai-result-display" className="bg-black p-3 rounded border border-gray-800 text-xs font-mono text-gray-400 max-h-60 overflow-y-auto whitespace-pre-wrap">
               {result}
             </div>
           </div>

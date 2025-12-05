@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * UI Primitive: Tabs
+ * 
+ * Location: Reusable component used throughout the app.
+ * Purpose: A set of layered sections of content—known as tab panels—that are displayed one at a time.
+ */
 import * as React from "react"
 import * as TabsPrimitive from "@radix-ui/react-tabs"
 

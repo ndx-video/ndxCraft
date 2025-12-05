@@ -521,14 +521,16 @@ const App: React.FC = () => {
 
   return (
     <div
+      id="ndx-app-container"
       className="flex flex-col h-screen bg-gray-950 text-gray-100 overflow-hidden font-sans"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
       {/* Top Bar */}
-      <div className="h-6 bg-black flex items-center px-4 justify-between border-b border-gray-800 select-none z-20 text-[10px] text-gray-600">
+      <div id="ndx-top-bar" className="h-6 bg-black flex items-center px-4 justify-between border-b border-gray-800 select-none z-20 text-[10px] text-gray-600">
         <div className="flex items-center gap-3">
           <button
+            id="ndx-toggle-sidebar-btn"
             onClick={() => setLeftPanelOpen(!leftPanelOpen)}
             className={`hover:text-gray-300 transition-colors ${leftPanelOpen ? 'text-indigo-400' : ''}`}
             title="Toggle Sidebar"
@@ -555,6 +557,7 @@ const App: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
+            id="ndx-toggle-assistant-btn"
             onClick={() => setRightPanelOpen(!rightPanelOpen)}
             className={`flex items-center gap-1 hover:text-gray-300 transition-colors ${rightPanelOpen ? 'text-indigo-400' : ''}`}
             title="Toggle Assistant"
@@ -577,7 +580,7 @@ const App: React.FC = () => {
       />
 
       {/* Main Workspace */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div id="ndx-main-workspace" className="flex-1 flex overflow-hidden relative">
 
         <LeftSidebar
           isOpen={leftPanelOpen}
@@ -591,10 +594,10 @@ const App: React.FC = () => {
         />
 
         {/* Center Canvas */}
-        <div className="flex-1 flex min-w-0 bg-gray-900 relative">
+        <div id="ndx-center-canvas" className="flex-1 flex min-w-0 bg-gray-900 relative">
 
           {/* Editor Pane */}
-          <div className={`flex-1 flex flex-col min-w-0 border-r border-gray-800 transition-all duration-300 
+          <div id="ndx-editor-pane" className={`flex-1 flex flex-col min-w-0 border-r border-gray-800 transition-all duration-300 
             ${focusedPane === 'preview' ? 'hidden' : ''} 
             ${focusedPane === 'editor' ? 'flex-none w-full' : ''}`}
           >
@@ -611,7 +614,7 @@ const App: React.FC = () => {
           </div>
 
           {/* Preview Pane */}
-          <div className={`flex-1 flex flex-col min-w-0 bg-white transition-all duration-300 
+          <div id="ndx-preview-pane" className={`flex-1 flex flex-col min-w-0 bg-white transition-all duration-300 
             ${focusedPane === 'editor' ? 'hidden' : ''}
             ${focusedPane === 'preview' ? 'flex-none w-full' : ''}`}
           >
@@ -643,7 +646,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <div className="h-6 bg-black border-t border-gray-800 flex items-center px-4 text-[10px] text-gray-600 justify-between z-20">
+      <div id="ndx-footer" className="h-6 bg-black border-t border-gray-800 flex items-center px-4 text-[10px] text-gray-600 justify-between z-20">
         <div className="flex gap-4">
           <span>{content.length} chars</span>
           <span>{content.split('\n').length} lines</span>

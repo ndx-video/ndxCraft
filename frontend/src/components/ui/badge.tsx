@@ -1,3 +1,9 @@
+/**
+ * UI Primitive: Badge
+ * 
+ * Location: Reusable component used throughout the app.
+ * Purpose: Displays a small status indicator or label.
+ */
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -25,7 +31,7 @@ const badgeVariants = cva(
 
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof badgeVariants> {}
+  VariantProps<typeof badgeVariants> { }
 
 function Badge({ className, variant, ...props }: BadgeProps) {
   return (

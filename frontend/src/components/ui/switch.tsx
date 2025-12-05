@@ -1,3 +1,9 @@
+/**
+ * UI Primitive: Switch
+ * 
+ * Location: Reusable component used throughout the app.
+ * Purpose: A toggle switch control.
+ */
 import * as React from "react"
 import * as SwitchPrimitives from "@radix-ui/react-switch"
 

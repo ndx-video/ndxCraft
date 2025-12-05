@@ -1,3 +1,10 @@
+/**
+ * Preview Component
+ * 
+ * Location: Right pane of the application (when toggled on).
+ * Purpose: Renders the AsciiDoc content visually. It updates in real-time 
+ *          as the user types in the Editor and supports scroll synchronization.
+ */
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Maximize2, Minimize2, Edit3 } from 'lucide-react';
 import { convertToHtml } from '../services/asciidocService';
@@ -231,13 +238,14 @@ const Preview: React.FC<PreviewProps> = ({
   // ... (rest of the component)
 
   return (
-    <div className={`relative h-full w-full bg-white transition-all duration-300 flex flex-col border ${isActive && isEditing ? 'border-amber-500' : 'border-transparent'} ${isFocused ? 'fixed inset-0 z-50' : ''}`}>
+    <div id="ndx-preview-container" className={`relative h-full w-full bg-white transition-all duration-300 flex flex-col border ${isActive && isEditing ? 'border-amber-500' : 'border-transparent'} ${isFocused ? 'fixed inset-0 z-50' : ''}`}>
 
       <div className="absolute top-2 right-4 z-10 flex gap-2">
         <div className="bg-gray-100/80 backdrop-blur px-2 py-1.5 rounded text-xs text-gray-500 font-medium flex items-center gap-2 border border-gray-200">
           {isEditing ? <span className="text-amber-600 animate-pulse">Visual Edit Active</span> : <span>Read Only Preview</span>}
         </div>
         <button
+          id="ndx-preview-edit-toggle"
           onMouseDown={(e) => {
             e.preventDefault();
             onToggleEditing?.();
@@ -251,6 +259,7 @@ const Preview: React.FC<PreviewProps> = ({
           <Edit3 size={16} />
         </button>
         <button
+          id="ndx-preview-focus-toggle"
           onClick={onToggleFocus}
           className="bg-gray-100 text-gray-500 hover:text-gray-900 p-1.5 rounded transition-colors"
           title={isFocused ? "Exit Focus Mode" : "Focus Preview"}
@@ -261,6 +270,7 @@ const Preview: React.FC<PreviewProps> = ({
 
       <div className="flex-1 overflow-hidden bg-white">
         <iframe
+          id="ndx-preview-iframe"
           ref={iframeRef}
           title="Preview"
           srcDoc={srcDoc}

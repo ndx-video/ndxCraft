@@ -1,3 +1,10 @@
+/**
+ * Editor Component
+ * 
+ * Location: Central area of the application (left pane when Preview is open).
+ * Purpose: The main text editing interface. It wraps the Monaco Editor and handles 
+ *          text input, scrolling, and synchronization with the Preview.
+ */
 import React, { forwardRef } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
@@ -11,9 +18,10 @@ interface EditorProps {
 
 const Editor = forwardRef<HTMLTextAreaElement, EditorProps>(({ value, onChange, isFocused, onToggleFocus, onCursorMove }, ref) => {
   return (
-    <div className={`relative h-full w-full bg-gray-900 transition-all duration-300 border border-transparent focus-within:border-indigo-500 ${isFocused ? 'fixed inset-0 z-50' : ''}`}>
+    <div id="ndx-editor-container" className={`relative h-full w-full bg-gray-900 transition-all duration-300 border border-transparent focus-within:border-indigo-500 ${isFocused ? 'fixed inset-0 z-50' : ''}`}>
       {/* Focus Toggle */}
       <button
+        id="ndx-editor-focus-toggle"
         onClick={onToggleFocus}
         className="absolute top-2 right-4 z-10 text-gray-500 hover:text-white bg-gray-800/50 hover:bg-gray-700 p-1.5 rounded transition-colors"
         title={isFocused ? "Exit Focus Mode" : "Focus Source"}
@@ -22,6 +30,7 @@ const Editor = forwardRef<HTMLTextAreaElement, EditorProps>(({ value, onChange, 
       </button>
 
       <textarea
+        id="ndx-editor-textarea"
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}

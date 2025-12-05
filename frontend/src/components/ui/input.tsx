@@ -1,3 +1,9 @@
+/**
+ * UI Primitive: Input
+ * 
+ * Location: Reusable component used throughout the app.
+ * Purpose: A basic text input field.
+ */
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
