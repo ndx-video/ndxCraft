@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Toolbar from './components/Toolbar';
-import Editor from './components/Editor';
+import Editor, { EditorHandle } from './components/Editor';
 import Preview from './components/Preview';
 import AIAssistant from './components/AIAssistant';
 import LeftSidebar from './components/LeftSidebar';
@@ -109,10 +109,13 @@ const App: React.FC = () => {
           const savedPos = await GetAppState("cursorPos");
           if (savedPos) {
             setTimeout(() => {
-              if (textareaRef.current) {
+              if (editorRef.current) {
                 const pos = Number(savedPos);
-                textareaRef.current.setSelectionRange(pos, pos);
-                textareaRef.current.focus();
+                // Saved pos is now line number (or we treat it as such for new files)
+                // If it's a large number (legacy offset), we might default to 1
+                const line = pos > 100000 ? 1 : pos;
+                editorRef.current.setCursor(line, 1);
+                editorRef.current.focus();
               }
             }, 100);
           }
@@ -167,24 +170,16 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'preview-cursor') {
-        const offset = event.data.offset;
-        if (textareaRef.current) {
-          // Simple mapping: use the offset directly. 
-          // Note: This is an approximation as rendered text length != source text length.
-          // But it fulfills the requirement to "track the position".
-          // textareaRef.current.focus(); // REMOVED to prevent focus stealing
-          textareaRef.current.setSelectionRange(offset, offset);
-
-          // Optional: Scroll to cursor
-          // We can't easily calculate line number from offset without splitting string
-          // But setSelectionRange usually scrolls into view if focused.
-        }
+        // Legacy support or if we re-enable reverse sync
+        // For now, AST sync is one-way (Editor -> Preview)
+        // So we ignore this or remove the handler
       } else if (event.data.type === 'preview-edit') {
         // Update content from preview edit
         // WARNING: This comes from innerText, so it strips AsciiDoc formatting!
         // This is a "destructive" sync but fulfills the request for state management.
         const newContent = event.data.content;
         setContent(newContent);
+        editorRef.current?.setValue(newContent);
       } else if (event.data.type === 'preview-tab') {
         // Handle Tab from Preview: Switch to Code Editor
         setActiveEditor('code');
@@ -215,12 +210,11 @@ const App: React.FC = () => {
         }
 
         setTimeout(() => {
-          if (textareaRef.current) {
-            textareaRef.current.focus();
-            if (targetPos !== -1) {
-              textareaRef.current.setSelectionRange(targetPos, targetPos);
-              // Update ref to new position
-              cursorPosRef.current = targetPos;
+          if (editorRef.current) {
+            editorRef.current.focus();
+            if (sourcePos && sourcePos.line) {
+              editorRef.current.setCursor(sourcePos.line, 1);
+              cursorPosRef.current = sourcePos.line;
             }
           }
         }, 0);
@@ -264,12 +258,12 @@ const App: React.FC = () => {
   // Focus Modes
   const [focusedPane, setFocusedPane] = useState<'none' | 'editor' | 'preview'>('none');
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const cursorPosRef = useRef<number>(0);
+  const editorRef = useRef<EditorHandle>(null);
+  const cursorPosRef = useRef<number>(1); // Store line number
   const cursorSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [activeEditor, setActiveEditor] = useState<'code' | 'visual'>('code');
-  const [cursorOffset, setCursorOffset] = useState(0);
+  const [cursorLine, setCursorLine] = useState(1);
   const [isVisualEditEnabled, setIsVisualEditEnabled] = useState(false);
 
   const [focusTrigger, setFocusTrigger] = useState(0);
@@ -321,7 +315,9 @@ const App: React.FC = () => {
         setFocusedPane('editor');
         setActiveEditor('code');
         setIsVisualEditEnabled(false);
-        setTimeout(() => textareaRef.current?.focus(), 0);
+        setActiveEditor('code');
+        setIsVisualEditEnabled(false);
+        setTimeout(() => editorRef.current?.focus(), 0);
         return;
       }
 
@@ -352,7 +348,7 @@ const App: React.FC = () => {
             // Switch to Code Editor and Disable Edit Mode (Read Only)
             setActiveEditor('code');
             setIsVisualEditEnabled(false);
-            setTimeout(() => textareaRef.current?.focus(), 0);
+            setTimeout(() => editorRef.current?.focus(), 0);
           }
         }
         // If in Fullscreen Mode (Swap Editors)
@@ -368,7 +364,9 @@ const App: React.FC = () => {
             setFocusedPane('editor'); // Keep this for internal logic
             setActiveEditor('code');
             setIsVisualEditEnabled(false);
-            setTimeout(() => textareaRef.current?.focus(), 0);
+            setActiveEditor('code');
+            setIsVisualEditEnabled(false);
+            setTimeout(() => editorRef.current?.focus(), 0);
           } else {
             // Fallback for old "focusedPane" logic if any
             if (currentFocusedPane === 'editor') {
@@ -380,7 +378,9 @@ const App: React.FC = () => {
               setFocusedPane('editor');
               setActiveEditor('code');
               setIsVisualEditEnabled(false);
-              setTimeout(() => textareaRef.current?.focus(), 0);
+              setActiveEditor('code');
+              setIsVisualEditEnabled(false);
+              setTimeout(() => editorRef.current?.focus(), 0);
             }
           }
         }
@@ -395,7 +395,7 @@ const App: React.FC = () => {
           setFocusedPane('none');
           // Return focus to active editor
           if (currentActiveEditor === 'code') {
-            setTimeout(() => textareaRef.current?.focus(), 0);
+            setTimeout(() => editorRef.current?.focus(), 0);
           } else {
             setFocusTrigger(prev => prev + 1);
           }
@@ -417,10 +417,8 @@ const App: React.FC = () => {
       // If we are typing a character (length 1)
       if (e.key.length === 1) {
         if (currentActiveEditor === 'code') {
-          if (document.activeElement !== textareaRef.current) {
-            textareaRef.current?.focus();
-            // We don't prevent default here, we let the keypress happen in the now-focused element
-          }
+          // Monaco handles focus internally usually, but we can force it
+          editorRef.current?.focus();
         } else if (currentActiveEditor === 'visual') {
           // Force focus to visual editor
           setFocusTrigger(prev => prev + 1);
@@ -442,7 +440,7 @@ const App: React.FC = () => {
     const handleFocusIn = (e: FocusEvent) => {
       if (lastKey === 'Tab') {
         const target = e.target as HTMLElement;
-        const isEditor = target === textareaRef.current;
+        const isEditor = target.closest('#ndx-editor-container') !== null;
         const isPreview = target.tagName === 'IFRAME' || target.closest('#ndx-preview-container');
 
         // If focus lands on something that is NOT the editor or preview (e.g. buttons), bounce it back
@@ -452,7 +450,7 @@ const App: React.FC = () => {
 
           // Bounce back to active pane
           if (activeEditor === 'code') {
-            textareaRef.current?.focus();
+            editorRef.current?.focus();
           } else {
             // Focus preview iframe
             const iframe = document.getElementById('ndx-preview-iframe');
@@ -471,61 +469,40 @@ const App: React.FC = () => {
     };
   }, [activeEditor]);
 
-  const handleCursorMove = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+  const handleCursorMove = (line: number) => {
     setActiveEditor('code'); // Ensure code is active when moving cursor
-    const newOffset = e.currentTarget.selectionStart;
-    cursorPosRef.current = newOffset;
-    setCursorOffset(newOffset); // Keep state in sync for Preview
+    cursorPosRef.current = line;
+    setCursorLine(line); // Keep state in sync for Preview
 
     if (cursorSaveTimeoutRef.current) clearTimeout(cursorSaveTimeoutRef.current);
     cursorSaveTimeoutRef.current = setTimeout(() => {
-      SaveAppState("cursorPos", newOffset.toString());
+      SaveAppState("cursorPos", line.toString());
     }, 1000);
   };
 
   const handleInsert = (template: string, cursorOffset: number = 0) => {
     if (template === '') {
-      if (window.confirm("Clear all content?")) setContent('');
+      if (window.confirm("Clear all content?")) {
+        setContent('');
+        editorRef.current?.setValue('');
+      }
       return;
     }
 
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-
-    let newText = text.substring(0, start) + template + text.substring(end, text.length);
-    let newCursorPos = start + template.length;
-
-    if (start !== end && template.length > 2 && template[0] === template[template.length - 1]) {
-      const selection = text.substring(start, end);
-      const wrapper = template[0];
-      newText = text.substring(0, start) + wrapper + selection + wrapper + text.substring(end);
-      newCursorPos = end + 2;
-    } else if (cursorOffset > 0) {
-      newCursorPos = start + cursorOffset;
+    if (editorRef.current) {
+      editorRef.current.insertText(template);
+      editorRef.current.focus();
     }
-
-    setContent(newText);
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
   };
 
   const handleAIApply = (text: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      setContent(prev => prev + '\n' + text);
-      return;
+    if (editorRef.current) {
+      editorRef.current.insertText(text);
+    } else {
+      const newContent = content + '\n' + text;
+      setContent(newContent);
+      editorRef.current?.setValue(newContent);
     }
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const currentVal = textarea.value;
-    const newVal = currentVal.substring(0, start) + text + currentVal.substring(end);
-    setContent(newVal);
   };
 
   // Mock File Ops
@@ -568,6 +545,7 @@ const App: React.FC = () => {
 
         const text = await ReadFile(filePath);
         setContent(text);
+        editorRef.current?.setValue(text);
         setFileName(filePath);
       }
     } catch (err) {
@@ -626,17 +604,21 @@ const App: React.FC = () => {
           if (shadowDirty) {
             console.log("Loaded dirty shadow file");
             setContent(shadowContent);
+            editorRef.current?.setValue(shadowContent);
             // isDirty will be true because content != savedContent (diskContent)
           } else {
             setContent(diskContent);
+            editorRef.current?.setValue(diskContent);
           }
         } else {
           setContent(diskContent);
+          editorRef.current?.setValue(diskContent);
         }
       } catch (e) {
         // Fallback to disk if shadow fails
         console.warn("Shadow check failed, using disk:", e);
         setContent(diskContent);
+        editorRef.current?.setValue(diskContent);
       }
 
       setFileName(path); // Keep just the name for display if it was from the list
@@ -702,27 +684,10 @@ const App: React.FC = () => {
   };
 
   const handleNavigate = (line: number) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const lines = content.split('\n');
-    if (line < 1 || line > lines.length) return;
-
-    let offset = 0;
-    for (let i = 0; i < line - 1; i++) {
-      offset += lines[i].length + 1; // +1 for newline
+    if (editorRef.current) {
+      editorRef.current.setCursor(line, 1);
+      editorRef.current.focus();
     }
-
-    // Jump to the end of the line (the header)
-    offset += lines[line - 1].length;
-
-    textarea.focus();
-    textarea.setSelectionRange(offset, offset);
-
-    // Attempt to scroll roughly to the line (assuming ~24px line height)
-    // This is a heuristic; exact scrolling requires more complex measurement
-    const lineHeight = 24;
-    textarea.scrollTop = (line - 5) * lineHeight; // Scroll a bit above
   };
 
 
@@ -736,6 +701,7 @@ const App: React.FC = () => {
           await performOpenFile(fileName);
         } else {
           setContent(INITIAL_CONTENT);
+          editorRef.current?.setValue(INITIAL_CONTENT);
           setSavedContent(INITIAL_CONTENT);
           setIsDirty(false);
         }
@@ -839,7 +805,10 @@ const App: React.FC = () => {
             activeTab={activeLeftTab}
             onTabChange={setActiveLeftTab}
             content={content}
-            onContentChange={setContent}
+            onContentChange={(newContent) => {
+              setContent(newContent);
+              editorRef.current?.setValue(newContent);
+            }}
             fileTree={fileTree}
             onFileClick={handleOpenFile}
             onNavigate={handleNavigate}
@@ -855,8 +824,8 @@ const App: React.FC = () => {
             ${(focusedPane === 'editor' || appLayoutMode === 'fullscreen-code') ? 'flex-none w-full' : ''}`}
           >
             <Editor
-              ref={textareaRef}
-              value={content}
+              ref={editorRef}
+              defaultValue={INITIAL_CONTENT}
               onChange={setContent}
               isFocused={focusedPane === 'editor' || appLayoutMode === 'fullscreen-code'}
               onToggleFocus={() => {
@@ -867,9 +836,7 @@ const App: React.FC = () => {
                   setFocusedPane(focusedPane === 'editor' ? 'none' : 'editor');
                 }
               }}
-              onCursorMove={handleCursorMove}
-              isActive={activeEditor === 'code'}
-              onActivate={() => setActiveEditor('code')}
+              onCursorChange={handleCursorMove}
             />
           </div>
 
@@ -889,7 +856,7 @@ const App: React.FC = () => {
                   setFocusedPane(focusedPane === 'preview' ? 'none' : 'preview');
                 }
               }}
-              cursorOffset={cursorOffset}
+              cursorLine={cursorLine}
               isActive={activeEditor === 'visual'}
               onActivate={() => setActiveEditor('visual')}
               focusTrigger={focusTrigger}

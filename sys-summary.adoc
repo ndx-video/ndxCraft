@@ -1,0 +1,48 @@
+= ndxCraft System Summary
+:toc: macro
+
+== Architecture Overview
+
+ndxCraft is a hybrid desktop application built using the **Wails** framework, combining the performance of **Go** with the flexibility of **React**.
+
+* **Backend (Go)**: Handles file system operations, project management, AI integration (Gemini), and application state persistence using **SQLite**. It serves as the bridge between the OS and the frontend.
+* **Frontend (React + TypeScript)**: Provides the user interface, managed via **Vite**. It uses **Tailwind CSS** for styling and **Shadcn UI** for components.
+* **Communication**: The frontend and backend communicate via Wails' runtime and generated bindings, allowing seamless function calls from JavaScript to Go.
+
+== Layout & Dual-Pane Editor
+
+The core of the application is the **Dual-Pane Editor**, designed to bridge the gap between raw code and visual representation.
+
+* **Left Pane (Code Editor)**: Currently implemented as a raw HTML `textarea`. It captures user input and serves as the source of truth.
+* **Right Pane (HTML Preview)**: An `iframe` that renders the AsciiDoc content in real-time. It uses a custom script to handle scroll synchronization and "visual editing" (contenteditable).
+* **Sidebar**: A file explorer and document structure view (AST/Block mode) for navigation.
+
+== Current Challenges
+
+1.  **Editor Limitations**:
+    *   The current `textarea` implementation lacks essential code editing features like **syntax highlighting**, **line numbers**, **code folding**, and **auto-completion**.
+    *   The README mentions "Monaco Editor", but the actual implementation is a basic text input, creating a discrepancy between documentation and reality.
+
+2.  **Synchronization Issues**:
+    *   **Scroll Sync**: The current implementation uses "character offset" mapping (`preview-cursor` message). This is inherently imprecise because the rendered HTML length differs significantly from the source AsciiDoc (due to macros, includes, and formatting).
+    *   **Visual Editing Data Loss**: The "Visual Edit" mode in the preview pane relies on `document.body.innerText` to sync changes back to the editor. This **strips all AsciiDoc formatting** (bold, headers, links), making it destructive and practically unusable for rich documents.
+
+3.  **Performance**:
+    *   The entire document is re-converted to HTML on every keystroke. For large documents, this will cause significant input lag.
+
+== Game-Changer Tech: The Path Forward
+
+To realize the vision of a true "Dual-Pane Editor" and solve the challenges above, we recommend adopting **Monaco Editor** combined with **AST-Based Synchronization**.
+
+=== 1. Monaco Editor (The "Code" Game-Changer)
+Replacing the `textarea` with **Monaco Editor** (the engine powering VS Code) is the single most impactful upgrade we can make.
+*   **Why**: It provides out-of-the-box syntax highlighting for AsciiDoc, minimap, robust undo/redo stack, and high-performance text handling.
+*   **Benefit**: It transforms the app from a "notepad" into a professional IDE-grade tool.
+
+=== 2. AST-Based Synchronization (The "Sync" Game-Changer)
+Instead of counting characters, we should leverage the **AsciiDoc AST (Abstract Syntax Tree)**.
+*   **How**: When Asciidoctor converts text, it can generate source line numbers for blocks (`data-line` attributes).
+*   **Benefit**: We can map a cursor position in Monaco (Line X) directly to the corresponding HTML block (Element with `data-line-X`) in the preview. This ensures **pixel-perfect scroll syncing** regardless of content length or formatting.
+
+=== 3. Wails (The "Platform" Game-Changer)
+We are already using this, but leveraging it further for **native file watching** and **offloading heavy compilation tasks** to Go (instead of the JS thread) could significantly boost performance.

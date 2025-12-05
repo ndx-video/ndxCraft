@@ -15,7 +15,7 @@ interface PreviewProps {
   onToggleFocus: () => void;
   onVisualEdit?: (val: string) => void;
   customCss?: string;
-  cursorOffset?: number;
+  cursorLine?: number; // Changed from cursorOffset
   isActive?: boolean;
   onActivate?: () => void;
   focusTrigger?: number;
@@ -25,7 +25,7 @@ interface PreviewProps {
 
 const Preview: React.FC<PreviewProps> = ({
   content, isFocused, onToggleFocus, onVisualEdit, customCss,
-  cursorOffset, isActive, onActivate, focusTrigger,
+  cursorLine, isActive, onActivate, focusTrigger,
   isEditing = false, onToggleEditing
 }) => {
   const [html, setHtml] = useState<string>('');
@@ -66,6 +66,12 @@ const Preview: React.FC<PreviewProps> = ({
           pre code { background: transparent; padding: 0; color: inherit; }
           blockquote { border-left: 4px solid #e5e7eb; padding-left: 1em; font-style: italic; color: #4b5563; }
           img { max-width: 100%; height: auto; }
+          
+          /* Highlight target for debugging/visual feedback */
+          .highlight-target {
+            background-color: rgba(255, 255, 0, 0.2);
+            transition: background-color 0.5s;
+          }
         </style>
         <style id="custom-style"></style>
       </head>
@@ -79,50 +85,29 @@ const Preview: React.FC<PreviewProps> = ({
           function notifyFocus() { window.parent.postMessage({ type: 'preview-focus' }, '*'); }
           function notifyBlur() { window.parent.postMessage({ type: 'preview-blur' }, '*'); }
           
-          function setCaretPosition(offset) {
-            const range = document.createRange();
-            const sel = window.getSelection();
-            let currentOffset = 0;
-            let found = false;
-
-            function traverse(node) {
-              if (found) return;
-              if (node.nodeType === 3) { // Text node
-                const len = node.length;
-                if (currentOffset + len >= offset) {
-                  range.setStart(node, offset - currentOffset);
-                  range.collapse(true);
-                  sel.removeAllRanges();
-                  sel.addRange(range);
-                  found = true;
-                } else {
-                  currentOffset += len;
-                }
-              } else {
-                for (let i = 0; i < node.childNodes.length; i++) {
-                  traverse(node.childNodes[i]);
-                }
+          function scrollToLine(line) {
+            if (!line) return;
+            
+            // Find exact match
+            let target = document.querySelector('.data-line-' + line);
+            
+            // If not found, find nearest preceding line
+            if (!target) {
+              // This is a naive search, could be optimized
+              // We iterate down from the requested line
+              for (let i = line; i > 0; i--) {
+                target = document.querySelector('.data-line-' + i);
+                if (target) break;
               }
             }
-            traverse(document.body);
-          }
-
-          function getCaretCharacterOffsetWithin(element) {
-            var caretOffset = 0;
-            var doc = element.ownerDocument || element.document;
-            var win = doc.defaultView || doc.parentWindow;
-            var sel;
-            if (typeof win.getSelection != "undefined") {
-                sel = win.getSelection();
-                if (sel.rangeCount > 0) {
-                    var range = win.getSelection().getRangeAt(0);
-                    var preCaretRange = range.cloneRange();
-                    preCaretRange.selectNodeContents(element);
-                    preCaretRange.setEnd(range.endContainer, range.endOffset);
-                    caretOffset = preCaretRange.toString().length;
-                }
+            
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              
+              // Optional: Highlight
+              // document.querySelectorAll('.highlight-target').forEach(el => el.classList.remove('highlight-target'));
+              // target.classList.add('highlight-target');
             }
-            return caretOffset;
           }
 
           // --- Event Listeners ---
@@ -167,64 +152,6 @@ const Preview: React.FC<PreviewProps> = ({
               window.parent.postMessage({ type: 'preview-keydown', key: e.key }, '*');
               return;
             }
-
-            if (e.key === 'Tab') {
-              e.preventDefault();
-              e.stopPropagation();
-              
-              // Capture Source Map Position for Precise Resume
-              const sel = window.getSelection();
-              let sourcePos = null;
-
-              if (sel.rangeCount > 0) {
-                 const range = sel.getRangeAt(0);
-                 const startNode = range.startContainer;
-                 const startOffset = range.startOffset;
-
-                 // 1. Find nearest block with data-line class
-                 let current = startNode;
-                 let lineNum = -1;
-
-                 // Traverse up
-                 while (current && current !== document.body) {
-                   if (current.nodeType === 1) { // Element
-                     const el = current;
-                     // Check classList for data-line-X
-                     const lineClass = Array.from(el.classList).find(c => c.startsWith('data-line-'));
-                     if (lineClass) {
-                       lineNum = parseInt(lineClass.replace('data-line-', ''), 10);
-                       break;
-                     }
-                   }
-                   current = current.parentNode;
-                 }
-
-                 if (lineNum !== -1 && current) {
-                   // 2. Calculate offset relative to the start of this block
-                   // We need to count characters from the start of the block up to the caret
-                   const preCaretRange = range.cloneRange();
-                   preCaretRange.selectNodeContents(current);
-                   preCaretRange.setEnd(startNode, startOffset);
-                   const relativeOffset = preCaretRange.toString().length;
-                   
-                   sourcePos = { line: lineNum, offset: relativeOffset };
-                 }
-              }
-
-              window.parent.postMessage({ type: 'preview-tab', sourcePos }, '*');
-            }
-          });
-
-          document.addEventListener('selectionchange', () => {
-             const selection = document.getSelection();
-             if (selection.rangeCount > 0) {
-               const offset = getCaretCharacterOffsetWithin(document.body);
-               window.parent.postMessage({ type: 'preview-cursor', offset: offset }, '*');
-             }
-          });
-
-          document.body.addEventListener('input', function() {
-            window.parent.postMessage({ type: 'preview-edit', content: document.body.innerText }, '*');
           });
 
           // --- Message Handling ---
@@ -240,28 +167,8 @@ const Preview: React.FC<PreviewProps> = ({
               case 'update-css':
                 customStyle.textContent = data.css;
                 break;
-              case 'set-edit-mode':
-                document.body.contentEditable = data.isEditing ? 'true' : 'false';
-                if (data.isEditing) {
-                  document.body.focus();
-                }
-                break;
-              case 'set-cursor':
-                setCaretPosition(data.offset);
-                // Do not force focus here, as it steals focus from code editor during background sync
-                break;
-              case 'find-cursor-marker':
-                const marker = document.getElementById('ndx-cursor-marker');
-                if (marker) {
-                  const range = document.createRange();
-                  range.setStartBefore(marker);
-                  range.collapse(true);
-                  const sel = window.getSelection();
-                  sel.removeAllRanges();
-                  sel.addRange(range);
-                  marker.remove(); // Clean up
-                  marker.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                }
+              case 'scroll-to-line':
+                scrollToLine(data.line);
                 break;
             }
           });
@@ -290,12 +197,11 @@ const Preview: React.FC<PreviewProps> = ({
 
   // Update Content
   useEffect(() => {
-    if (iframeLoaded && iframeRef.current && (!isEditing || !isActive)) {
-      // Update content if we are NOT editing OR if we are editing but not the active pane (background sync)
+    if (iframeLoaded && iframeRef.current) {
       const html = convertToHtml(content);
       iframeRef.current.contentWindow?.postMessage({ type: 'update-content', html }, '*');
     }
-  }, [content, iframeLoaded, isEditing, isActive]);
+  }, [content, iframeLoaded]);
 
   // Update CSS
   useEffect(() => {
@@ -304,68 +210,17 @@ const Preview: React.FC<PreviewProps> = ({
     }
   }, [customCss, iframeLoaded]);
 
-  // Update Edit Mode
+  // Sync Scroll (Code -> Preview)
   useEffect(() => {
-    if (iframeLoaded && iframeRef.current) {
-      iframeRef.current.contentWindow?.postMessage({ type: 'set-edit-mode', isEditing }, '*');
+    if (iframeLoaded && iframeRef.current && cursorLine !== undefined) {
+      iframeRef.current.contentWindow?.postMessage({ type: 'scroll-to-line', line: cursorLine }, '*');
     }
-  }, [isEditing, iframeLoaded]);
-
-  // Update Cursor (Sync from Code Editor)
-  useEffect(() => {
-    if (iframeLoaded && iframeRef.current && isEditing) {
-      // Sync cursor whenever we are editing, even in background
-      if (cursorOffset !== undefined) {
-        iframeRef.current.contentWindow?.postMessage({ type: 'set-cursor', offset: cursorOffset }, '*');
-      }
-    }
-  }, [cursorOffset, isEditing, iframeLoaded]);
-
-  // Force Focus when Active
-  useEffect(() => {
-    if (isActive && isEditing && iframeRef.current) {
-      iframeRef.current.contentWindow?.focus();
-    }
-  }, [isActive, isEditing]);
-
-  // Initial Sync on Activation (Code -> Visual)
-  useEffect(() => {
-    if (isActive && isEditing && iframeLoaded && iframeRef.current) {
-      // We just switched to Visual Mode. 
-      // Render with the cursor marker to ensure precise positioning.
-      const html = convertToHtml(content, cursorOffset);
-      iframeRef.current.contentWindow?.postMessage({ type: 'update-content', html }, '*');
-
-      // Tell iframe to find the marker
-      setTimeout(() => {
-        iframeRef.current?.contentWindow?.postMessage({ type: 'find-cursor-marker' }, '*');
-      }, 50);
-    }
-  }, [isActive, isEditing, iframeLoaded]); // Dependencies ensure this runs when we switch modes
-
-  // ... (rest of the component)
+  }, [cursorLine, iframeLoaded]);
 
   return (
     <div id="ndx-preview-container" className={`relative h-full w-full bg-white transition-all duration-300 flex flex-col border ${isActive && isEditing ? 'border-amber-500' : 'border-transparent'} ${isFocused ? 'fixed inset-0 z-50' : ''}`}>
 
       <div className="absolute top-2 right-4 z-10 flex gap-2">
-        <div className="bg-gray-100/80 backdrop-blur px-2 py-1.5 rounded text-xs text-gray-500 font-medium flex items-center gap-2 border border-gray-200">
-          {isEditing ? <span className="text-amber-600 animate-pulse">Visual Edit Active</span> : <span>Read Only Preview</span>}
-        </div>
-        <button
-          id="ndx-preview-edit-toggle"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            onToggleEditing?.();
-            // If we are enabling editing, we should also activate this pane
-            if (!isEditing) onActivate?.();
-            e.currentTarget.blur();
-          }}
-          className={`p-1.5 rounded transition-colors ${isEditing ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500 hover:text-gray-900'}`}
-          title="Toggle Visual Editing (Experimental)"
-        >
-          <Edit3 size={16} />
-        </button>
         <button
           id="ndx-preview-focus-toggle"
           onClick={onToggleFocus}
