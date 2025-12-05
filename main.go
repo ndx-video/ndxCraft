@@ -12,6 +12,11 @@ import (
 var assets embed.FS
 
 func main() {
+	// Initialize database
+	if err := InitDB(); err != nil {
+		println("Error initializing database:", err.Error())
+	}
+
 	// Create an instance of the app structure
 	app := NewApp()
 
