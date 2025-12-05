@@ -7,6 +7,8 @@
 :sectanchors:
 :source-highlighter: rouge
 
+image:Screenshot.png[link="https://github.com/ndx-video/ndxCraft/blob/main/Screenshot.png"]
+
 image:https://img.shields.io/badge/Built%20with-Wails-red[link="https://wails.io"]
 image:https://img.shields.io/badge/Frontend-React-blue[link="https://react.dev"]
 image:https://img.shields.io/badge/Language-AsciiDoc-orange[link="https://asciidoc.org"]
