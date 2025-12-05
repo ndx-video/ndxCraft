@@ -6,13 +6,14 @@ interface EditorProps {
   onChange: (val: string) => void;
   isFocused: boolean;
   onToggleFocus: () => void;
+  onCursorMove?: (e: React.SyntheticEvent<HTMLTextAreaElement>) => void;
 }
 
-const Editor = forwardRef<HTMLTextAreaElement, EditorProps>(({ value, onChange, isFocused, onToggleFocus }, ref) => {
+const Editor = forwardRef<HTMLTextAreaElement, EditorProps>(({ value, onChange, isFocused, onToggleFocus, onCursorMove }, ref) => {
   return (
-    <div className={`relative h-full w-full bg-gray-900 transition-all duration-300 ${isFocused ? 'fixed inset-0 z-50' : ''}`}>
+    <div className={`relative h-full w-full bg-gray-900 transition-all duration-300 border border-transparent focus-within:border-indigo-500 ${isFocused ? 'fixed inset-0 z-50' : ''}`}>
       {/* Focus Toggle */}
-      <button 
+      <button
         onClick={onToggleFocus}
         className="absolute top-2 right-4 z-10 text-gray-500 hover:text-white bg-gray-800/50 hover:bg-gray-700 p-1.5 rounded transition-colors"
         title={isFocused ? "Exit Focus Mode" : "Focus Source"}
@@ -24,6 +25,9 @@ const Editor = forwardRef<HTMLTextAreaElement, EditorProps>(({ value, onChange, 
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onSelect={onCursorMove}
+        onKeyUp={onCursorMove}
+        onClick={onCursorMove}
         className="w-full h-full p-6 bg-gray-900 text-gray-200 font-mono text-sm resize-none outline-none border-none leading-relaxed custom-scrollbar"
         spellCheck={false}
         placeholder="Type your AsciiDoc here..."

@@ -4,6 +4,7 @@ export interface SectionBlock {
   title: string;
   level: number;
   lines: string[];
+  startLine: number;
 }
 
 /**
@@ -16,8 +17,9 @@ export const parseBlocks = (content: string): SectionBlock[] => {
   let currentLines: string[] = [];
   let currentTitle = "Preamble";
   let currentLevel = 0;
+  let currentStartLine = 1;
 
-  lines.forEach((line) => {
+  lines.forEach((line, index) => {
     const headerMatch = line.match(/^(=+)\s+(.+)$/);
     if (headerMatch) {
       // If we have accumulated lines for the previous block, push it
@@ -25,13 +27,15 @@ export const parseBlocks = (content: string): SectionBlock[] => {
         blocks.push({
           title: currentTitle,
           level: currentLevel,
-          lines: [...currentLines]
+          lines: [...currentLines],
+          startLine: currentStartLine
         });
       }
       // Start new block
       currentTitle = headerMatch[2];
       currentLevel = headerMatch[1].length;
       currentLines = [line];
+      currentStartLine = index + 1;
     } else {
       currentLines.push(line);
     }
@@ -42,7 +46,8 @@ export const parseBlocks = (content: string): SectionBlock[] => {
     blocks.push({
       title: currentTitle,
       level: currentLevel,
-      lines: currentLines
+      lines: currentLines,
+      startLine: currentStartLine
     });
   }
 
@@ -70,5 +75,12 @@ export const moveBlock = (content: string, fromIndex: number, direction: 'up' | 
   blocks[fromIndex] = blocks[toIndex];
   blocks[toIndex] = temp;
 
+  return stringifyBlocks(blocks);
+};
+
+/**
+ * Reorders blocks based on a new array of blocks.
+ */
+export const reorderBlocks = (blocks: SectionBlock[]): string => {
   return stringifyBlocks(blocks);
 };
