@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Bold, Italic, Heading, List, ListOrdered, Link, Image,
-  Code, Table, Wand2, Eraser, FileText, Download, Upload, Settings
+  Code, Table, Wand2, Eraser, FileText, Download, Upload, Settings, Github
 } from 'lucide-react';
 
 interface ToolbarProps {
@@ -10,15 +10,18 @@ interface ToolbarProps {
   onOpen: () => void;
   onSave: () => void;
   onSettings: () => void;
+  onGitHub: () => void;
+  onViewSource: () => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave, onSettings }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave, onSettings, onGitHub, onViewSource }) => {
 
   const Btn = ({ icon: Icon, label, onClick }: { icon: any, label: string, onClick: () => void }) => (
     <button
       onClick={onClick}
       className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors flex items-center gap-2 group relative"
       title={label}
+      tabIndex={-1}
     >
       <Icon size={18} />
       {/* Tooltip */}
@@ -49,15 +52,33 @@ const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave
 
       <div className="flex items-center gap-2">
         <button
+          onClick={onViewSource}
+          className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+          title="View HTML Source"
+          tabIndex={-1}
+        >
+          <Code size={20} />
+        </button>
+        <button
+          onClick={onGitHub}
+          className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+          title="Open in GitHub Desktop"
+          tabIndex={-1}
+        >
+          <Github size={20} />
+        </button>
+        <button
           onClick={onSettings}
           className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
           title="Settings"
+          tabIndex={-1}
         >
           <Settings size={20} />
         </button>
         <button
           onClick={onAIRequest}
           className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-sm font-medium transition-colors shadow-lg shadow-indigo-500/20"
+          tabIndex={-1}
         >
           <Wand2 size={16} />
           <span>AI Assistant</span>

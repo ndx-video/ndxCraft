@@ -12,14 +12,78 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Settings, Monitor, Keyboard, Type, Palette } from 'lucide-react';
+import { Settings, Monitor, Keyboard, Type, Palette, FolderOpen } from 'lucide-react';
+import { SelectDirectory, GetAllPreferences, SavePreference } from '../../wailsjs/go/main/App';
 
 interface PreferencesModalProps {
   isOpen: boolean;
   onClose: () => void;
+  projectRoot: string;
+  onProjectRootChange: (path: string) => void;
+  onPreferencesChanged?: () => void;
 }
 
-const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose }) => {
+const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, projectRoot, onProjectRootChange, onPreferencesChanged }) => {
+  const [autoSave, setAutoSave] = React.useState(true);
+  const [spellCheck, setSpellCheck] = React.useState(true);
+  const [fontFamily, setFontFamily] = React.useState("Inter, sans-serif");
+  const [fontSize, setFontSize] = React.useState(16);
+  const [lineHeight, setLineHeight] = React.useState(1.6);
+  const [theme, setTheme] = React.useState("Midnight");
+
+  React.useEffect(() => {
+    if (isOpen) {
+      loadPreferences();
+    }
+  }, [isOpen]);
+
+  const loadPreferences = async () => {
+    try {
+      const prefs = await GetAllPreferences();
+      if (prefs) {
+        if (prefs.autoSave !== undefined) setAutoSave(prefs.autoSave as boolean);
+        if (prefs.spellCheck !== undefined) setSpellCheck(prefs.spellCheck as boolean);
+        if (prefs.fontFamily) setFontFamily(prefs.fontFamily as string);
+        if (prefs.fontSize) setFontSize(Number(prefs.fontSize));
+        if (prefs.lineHeight) setLineHeight(Number(prefs.lineHeight));
+        if (prefs.theme) setTheme(prefs.theme as string);
+        // projectRoot is handled via props/App state, but we could load it here too if needed
+      }
+    } catch (err) {
+      console.error("Failed to load preferences", err);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      await SavePreference("autoSave", autoSave);
+      await SavePreference("spellCheck", spellCheck);
+      await SavePreference("fontFamily", fontFamily);
+      await SavePreference("fontSize", fontSize);
+      await SavePreference("lineHeight", lineHeight);
+      await SavePreference("theme", theme);
+
+      // projectRoot is saved via App when it changes, or we can save it here if we want to be sure
+      await SavePreference("projectRoot", projectRoot);
+
+      if (onPreferencesChanged) onPreferencesChanged();
+      onClose();
+    } catch (err) {
+      console.error("Failed to save preferences", err);
+    }
+  };
+
+  const handleBrowseRoot = async () => {
+    try {
+      const path = await SelectDirectory();
+      if (path) {
+        onProjectRootChange(path);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] bg-gray-950 border-gray-800 text-gray-100 shadow-2xl shadow-indigo-500/10 backdrop-blur-xl">
@@ -52,12 +116,29 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose }) 
             {/* General Tab */}
             <TabsContent value="general" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="space-y-4">
+                <div className="p-4 rounded-lg bg-gray-900/30 border border-gray-800 hover:border-indigo-500/30 transition-colors space-y-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium text-gray-200">Project Root</Label>
+                    <p className="text-sm text-gray-500">The root directory for your project files and git repository.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={projectRoot || "Default (./content)"}
+                      readOnly
+                      className="bg-gray-900 border-gray-700 text-gray-400 font-mono text-sm"
+                    />
+                    <Button onClick={handleBrowseRoot} variant="outline" className="border-gray-700 hover:bg-gray-800">
+                      <FolderOpen className="w-4 h-4 mr-2" /> Browse
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between p-4 rounded-lg bg-gray-900/30 border border-gray-800 hover:border-indigo-500/30 transition-colors">
                   <div className="space-y-0.5">
                     <Label className="text-base font-medium text-gray-200">Auto-Save</Label>
                     <p className="text-sm text-gray-500">Automatically save your work every few minutes.</p>
                   </div>
-                  <Switch defaultChecked className="data-[state=checked]:bg-indigo-600" />
+                  <Switch checked={autoSave} onCheckedChange={setAutoSave} className="data-[state=checked]:bg-indigo-600" />
                 </div>
 
                 <div className="flex items-center justify-between p-4 rounded-lg bg-gray-900/30 border border-gray-800 hover:border-indigo-500/30 transition-colors">
@@ -65,7 +146,7 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose }) 
                     <Label className="text-base font-medium text-gray-200">Spell Check</Label>
                     <p className="text-sm text-gray-500">Highlight spelling errors as you type.</p>
                   </div>
-                  <Switch defaultChecked className="data-[state=checked]:bg-indigo-600" />
+                  <Switch checked={spellCheck} onCheckedChange={setSpellCheck} className="data-[state=checked]:bg-indigo-600" />
                 </div>
               </div>
             </TabsContent>
@@ -77,19 +158,37 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose }) 
                   <Label htmlFor="font-family" className="text-right text-gray-400">
                     Font Family
                   </Label>
-                  <Input id="font-family" defaultValue="Inter, sans-serif" className="col-span-3 bg-gray-900 border-gray-700 focus:border-indigo-500 text-gray-200" />
+                  <Input
+                    id="font-family"
+                    value={fontFamily}
+                    onChange={(e) => setFontFamily(e.target.value)}
+                    className="col-span-3 bg-gray-900 border-gray-700 focus:border-indigo-500 text-gray-200"
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="font-size" className="text-right text-gray-400">
                     Font Size
                   </Label>
-                  <Input id="font-size" type="number" defaultValue="16" className="col-span-3 bg-gray-900 border-gray-700 focus:border-indigo-500 text-gray-200" />
+                  <Input
+                    id="font-size"
+                    type="number"
+                    value={fontSize}
+                    onChange={(e) => setFontSize(Number(e.target.value))}
+                    className="col-span-3 bg-gray-900 border-gray-700 focus:border-indigo-500 text-gray-200"
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="line-height" className="text-right text-gray-400">
                     Line Height
                   </Label>
-                  <Input id="line-height" type="number" step="0.1" defaultValue="1.6" className="col-span-3 bg-gray-900 border-gray-700 focus:border-indigo-500 text-gray-200" />
+                  <Input
+                    id="line-height"
+                    type="number"
+                    step="0.1"
+                    value={lineHeight}
+                    onChange={(e) => setLineHeight(Number(e.target.value))}
+                    className="col-span-3 bg-gray-900 border-gray-700 focus:border-indigo-500 text-gray-200"
+                  />
                 </div>
               </div>
             </TabsContent>
@@ -97,16 +196,20 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose }) 
             {/* Theme Tab */}
             <TabsContent value="theme" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="grid grid-cols-3 gap-4">
-                {['Midnight', 'Nebula', 'Sunset'].map((theme) => (
-                  <div key={theme} className="cursor-pointer group relative overflow-hidden rounded-xl border border-gray-800 hover:border-indigo-500 transition-all">
-                    <div className={`h-24 bg-gradient-to-br ${theme === 'Midnight' ? 'from-gray-900 to-black' :
-                        theme === 'Nebula' ? 'from-indigo-900 to-purple-900' :
-                          'from-orange-900 to-red-900'
+                {['Midnight', 'Nebula', 'Sunset'].map((t) => (
+                  <div
+                    key={t}
+                    onClick={() => setTheme(t)}
+                    className={`cursor-pointer group relative overflow-hidden rounded-xl border transition-all ${theme === t ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-gray-800 hover:border-indigo-500'}`}
+                  >
+                    <div className={`h-24 bg-gradient-to-br ${t === 'Midnight' ? 'from-gray-900 to-black' :
+                      t === 'Nebula' ? 'from-indigo-900 to-purple-900' :
+                        'from-orange-900 to-red-900'
                       }`} />
                     <div className="p-3 bg-gray-900">
-                      <p className="font-medium text-gray-200 group-hover:text-indigo-400 transition-colors">{theme}</p>
+                      <p className={`font-medium transition-colors ${theme === t ? 'text-indigo-400' : 'text-gray-200 group-hover:text-indigo-400'}`}>{t}</p>
                     </div>
-                    {theme === 'Midnight' && (
+                    {t === 'Midnight' && (
                       <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.8)]" />
                     )}
                   </div>
@@ -143,7 +246,7 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose }) 
           <Button variant="outline" onClick={onClose} className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white">
             Cancel
           </Button>
-          <Button className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20">
+          <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20">
             Save Changes
           </Button>
         </DialogFooter>
