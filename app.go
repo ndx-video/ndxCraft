@@ -388,3 +388,33 @@ func (a *App) RestoreBackup() error {
 	}
 	return db.RestoreBackup()
 }
+
+// Project Methods
+
+func (a *App) AddProject(path string) error {
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	return db.AddProject(path)
+}
+
+func (a *App) GetProjects() ([]Project, error) {
+	if db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	return db.GetProjects()
+}
+
+func (a *App) RemoveProject(path string) error {
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	return db.RemoveProject(path)
+}
+
+func (a *App) UpdateProjectLastOpened(path string) error {
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	return db.UpdateProjectLastOpened(path)
+}

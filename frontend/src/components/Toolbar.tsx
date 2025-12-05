@@ -8,7 +8,7 @@
 import React from 'react';
 import {
   Bold, Italic, Heading, List, ListOrdered, Link, Image,
-  Code, Table, Wand2, Eraser, FileText, Download, Upload, Settings, Github
+  Code, Table, Wand2, Eraser, Download, Upload, Settings, Github, Folder
 } from 'lucide-react';
 
 interface ToolbarProps {
@@ -19,9 +19,10 @@ interface ToolbarProps {
   onSettings: () => void;
   onGitHub: () => void;
   onViewSource: () => void;
+  onProjectList: () => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave, onSettings, onGitHub, onViewSource }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave, onSettings, onGitHub, onViewSource, onProjectList }) => {
 
   const Btn = ({ icon: Icon, label, onClick, id }: { icon: any, label: string, onClick: () => void, id?: string }) => (
     <button
@@ -40,9 +41,9 @@ const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave
   );
 
   return (
-    <div id="ndx-toolbar" className="h-14 border-b border-gray-700 bg-gray-800 px-4 flex items-center justify-between shrink-0">
+    <div id="ndx-toolbar" className="h-8 border-b border-gray-700 bg-gray-800 px-4 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-1">
-        <Btn id="ndx-toolbar-new" icon={FileText} label="New / Clear" onClick={() => onInsert('', 0)} />
+        <Btn id="ndx-toolbar-projects" icon={Folder} label="Projects" onClick={onProjectList} />
         <Btn id="ndx-toolbar-open" icon={Upload} label="Open File" onClick={onOpen} />
         <Btn id="ndx-toolbar-save" icon={Download} label="Save File" onClick={onSave} />
         <div className="w-px h-6 bg-gray-600 mx-2" />
@@ -86,7 +87,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave
         >
           <Settings size={20} />
         </button>
-        <button
+        {/* <button
           id="ndx-toolbar-ai-assistant"
           onClick={onAIRequest}
           className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-sm font-medium transition-colors shadow-lg shadow-indigo-500/20"
@@ -94,7 +95,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave
         >
           <Wand2 size={16} />
           <span>AI Assistant</span>
-        </button>
+        </button> */}
       </div>
     </div>
   );

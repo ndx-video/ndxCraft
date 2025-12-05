@@ -111,6 +111,11 @@ func (d *Database) initTables() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			is_dirty BOOLEAN DEFAULT 0
 		);`,
+		`CREATE TABLE IF NOT EXISTS projects (
+			path TEXT PRIMARY KEY,
+			name TEXT,
+			last_opened DATETIME
+		);`,
 	}
 
 	for _, query := range queries {
@@ -313,4 +318,48 @@ func isCorrupt(path string) bool {
 		return true
 	}
 	return false
+}
+
+// Projects
+
+type Project struct {
+	Path       string    `json:"path"`
+	Name       string    `json:"name"`
+	LastOpened time.Time `json:"lastOpened"`
+}
+
+func (d *Database) AddProject(path string) error {
+	name := filepath.Base(path)
+	_, err := d.conn.Exec(`INSERT OR REPLACE INTO projects (path, name, last_opened) VALUES (?, ?, ?)`, path, name, time.Now())
+	return err
+}
+
+func (d *Database) GetProjects() ([]Project, error) {
+	rows, err := d.conn.Query(`SELECT path, name, last_opened FROM projects ORDER BY last_opened DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []Project
+	for rows.Next() {
+		var p Project
+		var lastOpened time.Time
+		if err := rows.Scan(&p.Path, &p.Name, &lastOpened); err != nil {
+			continue
+		}
+		p.LastOpened = lastOpened
+		projects = append(projects, p)
+	}
+	return projects, nil
+}
+
+func (d *Database) RemoveProject(path string) error {
+	_, err := d.conn.Exec(`DELETE FROM projects WHERE path = ?`, path)
+	return err
+}
+
+func (d *Database) UpdateProjectLastOpened(path string) error {
+	_, err := d.conn.Exec(`UPDATE projects SET last_opened = ? WHERE path = ?`, time.Now(), path)
+	return err
 }

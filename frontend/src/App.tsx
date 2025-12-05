@@ -7,7 +7,9 @@ import LeftSidebar from './components/LeftSidebar';
 import PreferencesModal from './components/PreferencesModal';
 import { EditorMode, LeftTab, FileNode } from './types';
 import { Sidebar, PanelRight, Circle } from 'lucide-react';
-import { ReadFile, SaveFile, SelectFile, SelectSaveFile, ListFiles, OpenGitHubDesktop, OpenBrowser, SaveShadowFile, GetShadowFile, SaveAppState, GetAppState, HasCorruption, RestoreBackup, SelectCssFile, GetFileTree, ClearShadowFile } from '../wailsjs/go/main/App';
+import ProjectListModal from './components/ProjectListModal';
+import { ReadFile, SaveFile, SelectFile, SelectSaveFile, ListFiles, OpenGitHubDesktop, OpenBrowser, SaveShadowFile, GetShadowFile, SaveAppState, GetAppState, HasCorruption, RestoreBackup, SelectCssFile, GetFileTree, ClearShadowFile, UpdateProjectLastOpened } from '../wailsjs/go/main/App';
+import { WindowFullscreen, WindowUnfullscreen, WindowIsFullscreen } from '../wailsjs/runtime/runtime';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +32,10 @@ v1.0, 2024-05-20
 == Introduction
 
 ndxCraft is a modern AsciiDoc editor built with **React, Wails, and Vite**.
+
+== Getting Started
+
+Click the **Projects** button in the toolbar to open or create a project.
 
 It features:
 * Real-time preview
@@ -67,6 +73,7 @@ const App: React.FC = () => {
   const [savedContent, setSavedContent] = useState<string>(INITIAL_CONTENT);
 
   const [projectRoot, setProjectRoot] = useState<string>('');
+  const [isProjectListOpen, setIsProjectListOpen] = useState(false);
 
   // Unsaved Changes Dialog State
   const [pendingFileToOpen, setPendingFileToOpen] = useState<string | null>(null);
@@ -82,7 +89,9 @@ const App: React.FC = () => {
   const [originalCssContent, setOriginalCssContent] = useState<string>('');
 
   useEffect(() => {
-    loadFiles();
+    if (projectRoot) {
+      loadFiles();
+    }
   }, [projectRoot]);
 
   // Load App State
@@ -148,6 +157,10 @@ const App: React.FC = () => {
     setIsDirty(content !== savedContent);
   }, [content, savedContent]);
 
+  // Ref to access latest content in event listener without re-binding
+  const contentRef = useRef(content);
+  useEffect(() => { contentRef.current = content; }, [content]);
+
   // Handle messages from Preview iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -170,6 +183,58 @@ const App: React.FC = () => {
         // This is a "destructive" sync but fulfills the request for state management.
         const newContent = event.data.content;
         setContent(newContent);
+      } else if (event.data.type === 'preview-tab') {
+        // Handle Tab from Preview: Switch to Code Editor
+        setActiveEditor('code');
+        setIsVisualEditEnabled(false);
+
+        const sourcePos = event.data.sourcePos;
+        let targetPos = -1;
+        const currentContent = contentRef.current;
+
+        if (sourcePos && sourcePos.line) {
+          // Calculate absolute character index from Line Number + Offset
+          const lines = currentContent.split('\n');
+          const lineIndex = sourcePos.line - 1; // Asciidoctor is 1-indexed
+
+          if (lineIndex >= 0 && lineIndex < lines.length) {
+            let charCount = 0;
+            for (let i = 0; i < lineIndex; i++) {
+              charCount += lines[i].length + 1; // +1 for newline
+            }
+
+            // Add the relative offset from the start of the block
+            // Note: We clamp it to the line length to be safe
+            const lineLength = lines[lineIndex].length;
+            const safeOffset = Math.min(sourcePos.offset, lineLength);
+
+            targetPos = charCount + safeOffset;
+          }
+        }
+
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            if (targetPos !== -1) {
+              textareaRef.current.setSelectionRange(targetPos, targetPos);
+              // Update ref to new position
+              cursorPosRef.current = targetPos;
+            }
+          }
+        }, 0);
+      } else if (event.data.type === 'preview-keydown') {
+        // Handle forwarded keydown from iframe
+        const key = event.data.key;
+        // Create a synthetic keyboard event and dispatch it to window
+        // Or just call the handler directly if we extract it
+        // Simpler: Just re-dispatch a new KeyboardEvent on window
+        const newEvent = new KeyboardEvent('keydown', {
+          key: key,
+          bubbles: true,
+          cancelable: true,
+          view: window
+        });
+        window.dispatchEvent(newEvent);
       }
     };
 
@@ -200,25 +265,131 @@ const App: React.FC = () => {
 
   const [focusTrigger, setFocusTrigger] = useState(0);
 
+  // App Layout Mode for True Fullscreen Editors
+  const [appLayoutMode, setAppLayoutMode] = useState<'default' | 'fullscreen-code' | 'fullscreen-visual'>('default');
+
+  // Refs for State Access in Event Listeners (Fixes Stale Closures & Dependency Issues)
+  const appLayoutModeRef = useRef(appLayoutMode);
+  const focusedPaneRef = useRef(focusedPane);
+  const activeEditorRef = useRef(activeEditor);
+
+  useEffect(() => { appLayoutModeRef.current = appLayoutMode; }, [appLayoutMode]);
+  useEffect(() => { focusedPaneRef.current = focusedPane; }, [focusedPane]);
+  useEffect(() => { activeEditorRef.current = activeEditor; }, [activeEditor]);
+
+  // Force Focus on Mount to ensure shortcuts work immediately
+  useEffect(() => {
+    window.focus();
+    // Also try to focus the container if possible
+    const container = document.getElementById('ndx-app-container');
+    if (container) container.focus();
+  }, []);
+
   // Global Keydown Handler for "Type-Through" and Tab Toggle
   useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+    const handleGlobalKeyDown = async (e: KeyboardEvent) => {
+      // Access latest state via refs
+      const currentLayoutMode = appLayoutModeRef.current;
+      const currentFocusedPane = focusedPaneRef.current;
+      const currentActiveEditor = activeEditorRef.current;
+
+      // F11: Toggle Application Fullscreen
+      if (e.key === 'F11') {
+        e.preventDefault();
+        const isFull = await WindowIsFullscreen();
+        if (isFull) {
+          WindowUnfullscreen();
+        } else {
+          WindowFullscreen();
+        }
+        return;
+      }
+
+      // F9: Code Editor Fullscreen (True Fullscreen)
+      if (e.key === 'F9') {
+        e.preventDefault();
+        setAppLayoutMode('fullscreen-code');
+        setFocusedPane('editor');
+        setActiveEditor('code');
+        setIsVisualEditEnabled(false);
+        setTimeout(() => textareaRef.current?.focus(), 0);
+        return;
+      }
+
+      // F10: Visual Editor Fullscreen (True Fullscreen)
+      if (e.key === 'F10') {
+        e.preventDefault();
+        setAppLayoutMode('fullscreen-visual');
+        setFocusedPane('preview');
+        setActiveEditor('visual');
+        setIsVisualEditEnabled(true);
+        setFocusTrigger(prev => prev + 1);
+        return;
+      }
+
       // Handle Tab Key Toggle
       if (e.key === 'Tab') {
         e.preventDefault(); // Prevent default tab behavior (indentation/focus change)
         e.stopPropagation(); // Prevent other handlers
 
-        if (activeEditor === 'code') {
-          // Switch to Visual Editor and Enable Edit Mode
-          setActiveEditor('visual');
-          setIsVisualEditEnabled(true);
-          setFocusTrigger(prev => prev + 1);
-        } else {
-          // Switch to Code Editor and Disable Edit Mode (Read Only)
-          setActiveEditor('code');
-          setIsVisualEditEnabled(false);
-          // Use setTimeout to ensure render cycle completes before focusing
-          setTimeout(() => textareaRef.current?.focus(), 0);
+        // If in Split View (Normal)
+        if (currentFocusedPane === 'none') {
+          if (currentActiveEditor === 'code') {
+            // Switch to Visual Editor and Enable Edit Mode
+            setActiveEditor('visual');
+            setIsVisualEditEnabled(true);
+            setFocusTrigger(prev => prev + 1);
+          } else {
+            // Switch to Code Editor and Disable Edit Mode (Read Only)
+            setActiveEditor('code');
+            setIsVisualEditEnabled(false);
+            setTimeout(() => textareaRef.current?.focus(), 0);
+          }
+        }
+        // If in Fullscreen Mode (Swap Editors)
+        else {
+          if (currentLayoutMode === 'fullscreen-code') {
+            setAppLayoutMode('fullscreen-visual');
+            setFocusedPane('preview'); // Keep this for internal logic
+            setActiveEditor('visual');
+            setIsVisualEditEnabled(true);
+            setFocusTrigger(prev => prev + 1);
+          } else if (currentLayoutMode === 'fullscreen-visual') {
+            setAppLayoutMode('fullscreen-code');
+            setFocusedPane('editor'); // Keep this for internal logic
+            setActiveEditor('code');
+            setIsVisualEditEnabled(false);
+            setTimeout(() => textareaRef.current?.focus(), 0);
+          } else {
+            // Fallback for old "focusedPane" logic if any
+            if (currentFocusedPane === 'editor') {
+              setFocusedPane('preview');
+              setActiveEditor('visual');
+              setIsVisualEditEnabled(true);
+              setFocusTrigger(prev => prev + 1);
+            } else {
+              setFocusedPane('editor');
+              setActiveEditor('code');
+              setIsVisualEditEnabled(false);
+              setTimeout(() => textareaRef.current?.focus(), 0);
+            }
+          }
+        }
+        return;
+      }
+
+      // Escape: Exit Fullscreen Mode
+      if (e.key === 'Escape') {
+        if (currentLayoutMode !== 'default') {
+          e.preventDefault();
+          setAppLayoutMode('default');
+          setFocusedPane('none');
+          // Return focus to active editor
+          if (currentActiveEditor === 'code') {
+            setTimeout(() => textareaRef.current?.focus(), 0);
+          } else {
+            setFocusTrigger(prev => prev + 1);
+          }
         }
         return;
       }
@@ -236,20 +407,59 @@ const App: React.FC = () => {
 
       // If we are typing a character (length 1)
       if (e.key.length === 1) {
-        if (activeEditor === 'code') {
+        if (currentActiveEditor === 'code') {
           if (document.activeElement !== textareaRef.current) {
             textareaRef.current?.focus();
             // We don't prevent default here, we let the keypress happen in the now-focused element
           }
-        } else if (activeEditor === 'visual') {
+        } else if (currentActiveEditor === 'visual') {
           // Force focus to visual editor
           setFocusTrigger(prev => prev + 1);
         }
       }
     };
 
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('keydown', handleGlobalKeyDown, true); // Use capture to intercept before others
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
+  }, []); // Empty dependency array: listener is attached ONCE and uses refs for state
+
+  // Focus Trap Safety Net
+  useEffect(() => {
+    let lastKey = '';
+    const handleKeyDown = (e: KeyboardEvent) => {
+      lastKey = e.key;
+    };
+
+    const handleFocusIn = (e: FocusEvent) => {
+      if (lastKey === 'Tab') {
+        const target = e.target as HTMLElement;
+        const isEditor = target === textareaRef.current;
+        const isPreview = target.tagName === 'IFRAME' || target.closest('#ndx-preview-container');
+
+        // If focus lands on something that is NOT the editor or preview (e.g. buttons), bounce it back
+        if (!isEditor && !isPreview) {
+          // console.log("Blocked tab focus to:", target);
+          target.blur();
+
+          // Bounce back to active pane
+          if (activeEditor === 'code') {
+            textareaRef.current?.focus();
+          } else {
+            // Focus preview iframe
+            const iframe = document.getElementById('ndx-preview-iframe');
+            iframe?.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('focusin', handleFocusIn);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('focusin', handleFocusIn);
+    };
   }, [activeEditor]);
 
   const handleCursorMove = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
@@ -477,8 +687,6 @@ const App: React.FC = () => {
   const handleViewSource = () => {
     // In a real app, we might want to get the innerHTML of the preview pane specifically.
     // For now, let's just get the whole document HTML or try to find the preview container.
-    // Since we don't have a ref to the preview container here easily without passing it up,
-    // we can use a selector or just dump the whole thing.
     // Better yet, let's try to get the element with class 'preview-content' if it exists, or just body.
     const previewElement = document.querySelector('.prose'); // Assuming Preview uses 'prose' class
     if (previewElement) {
@@ -519,6 +727,41 @@ const App: React.FC = () => {
     setCssContent(originalCssContent);
   };
 
+  const handleDiscardChanges = async () => {
+    if (!isDirty) return;
+
+    if (window.confirm(`Discard all changes to "${fileName}"? This cannot be undone.`)) {
+      try {
+        if (fileName !== 'untitled.adoc') {
+          await ClearShadowFile(fileName);
+          await performOpenFile(fileName);
+        } else {
+          setContent(INITIAL_CONTENT);
+          setSavedContent(INITIAL_CONTENT);
+          setIsDirty(false);
+        }
+      } catch (e) {
+        console.error("Failed to discard changes:", e);
+        alert("Failed to discard changes");
+      }
+    }
+  };
+
+  const handleProjectList = () => {
+    setIsProjectListOpen(true);
+  };
+
+  const handleSelectProject = async (path: string) => {
+    setProjectRoot(path);
+    setIsProjectListOpen(false);
+    try {
+      // @ts-ignore
+      await UpdateProjectLastOpened(path);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div
       id="ndx-app-container"
@@ -527,86 +770,105 @@ const App: React.FC = () => {
       onDragOver={handleDragOver}
     >
       {/* Top Bar */}
-      <div id="ndx-top-bar" className="h-6 bg-black flex items-center px-4 justify-between border-b border-gray-800 select-none z-20 text-[10px] text-gray-600">
-        <div className="flex items-center gap-3">
-          <button
-            id="ndx-toggle-sidebar-btn"
-            onClick={() => setLeftPanelOpen(!leftPanelOpen)}
-            className={`hover:text-gray-300 transition-colors ${leftPanelOpen ? 'text-indigo-400' : ''}`}
-            title="Toggle Sidebar"
-            tabIndex={-1}
-          >
-            <Sidebar size={12} />
-          </button>
-
+      {appLayoutMode === 'default' && (
+        <div id="ndx-top-bar" className="h-6 bg-black flex items-center px-4 justify-between border-b border-gray-800 select-none z-20 text-[10px] text-gray-600">
           <div className="flex items-center gap-3">
-            <span className="font-bold text-gray-400 tracking-tight">
-              ndxCraft
-            </span>
-            <div className="h-3 w-px bg-gray-800" />
-            <div className="flex items-center gap-2">
-              {isDirty && (
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_4px_rgba(245,158,11,0.5)] animate-pulse" />
-              )}
-              <span className={`truncate max-w-[300px] ${isDirty ? 'text-amber-500' : 'text-gray-500'}`}>
-                {fileName}
+            <button
+              id="ndx-toggle-sidebar-btn"
+              onClick={() => setLeftPanelOpen(!leftPanelOpen)}
+              className={`hover:text-gray-300 transition-colors ${leftPanelOpen ? 'text-indigo-400' : ''}`}
+              title="Toggle Sidebar"
+              tabIndex={-1}
+            >
+              <Sidebar size={12} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <span className="font-bold text-gray-400 tracking-tight">
+                ndxCraft
               </span>
+              <div className="h-3 w-px bg-gray-800" />
+              <div
+                id="ndx-current-file-name"
+                className="flex items-center gap-2 cursor-pointer hover:bg-gray-900 px-2 py-0.5 rounded transition-colors"
+                title="Double-click to discard changes and revert to saved"
+                onDoubleClick={handleDiscardChanges}
+              >
+                {isDirty && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_4px_rgba(245,158,11,0.5)] animate-pulse" />
+                )}
+                <span id="ndx-current-file-name-text" className={`truncate max-w-[300px] ${isDirty ? 'text-amber-500' : 'text-gray-500'}`}>
+                  {fileName}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            id="ndx-toggle-assistant-btn"
-            onClick={() => setRightPanelOpen(!rightPanelOpen)}
-            className={`flex items-center gap-1 hover:text-gray-300 transition-colors ${rightPanelOpen ? 'text-indigo-400' : ''}`}
-            title="Toggle Assistant"
-            tabIndex={-1}
-          >
-            <PanelRight size={12} />
-            <span className="hidden sm:inline">Assistant</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              id="ndx-toggle-assistant-btn"
+              onClick={() => setRightPanelOpen(!rightPanelOpen)}
+              className={`flex items-center gap-1 hover:text-gray-300 transition-colors ${rightPanelOpen ? 'text-indigo-400' : ''}`}
+              title="Toggle Assistant"
+              tabIndex={-1}
+            >
+              <PanelRight size={12} />
+              <span className="hidden sm:inline">Assistant</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      <Toolbar
-        onInsert={handleInsert}
-        onAIRequest={() => setRightPanelOpen(true)}
-        onOpen={handleOpen}
-        onSave={handleSave}
-        onSettings={() => setIsPreferencesOpen(true)}
-        onGitHub={handleGitHub}
-        onViewSource={handleViewSource}
-      />
+      {appLayoutMode === 'default' && (
+        <Toolbar
+          onInsert={handleInsert}
+          onAIRequest={() => setRightPanelOpen(true)}
+          onOpen={handleOpen}
+          onSave={handleSave}
+          onSettings={() => setIsPreferencesOpen(true)}
+          onGitHub={handleGitHub}
+          onViewSource={handleViewSource}
+          onProjectList={handleProjectList}
+        />
+      )}
 
       {/* Main Workspace */}
       <div id="ndx-main-workspace" className="flex-1 flex overflow-hidden relative">
 
-        <LeftSidebar
-          isOpen={leftPanelOpen}
-          activeTab={activeLeftTab}
-          onTabChange={setActiveLeftTab}
-          content={content}
-          onContentChange={setContent}
-          fileTree={fileTree}
-          onFileClick={handleOpenFile}
-          onNavigate={handleNavigate}
-        />
+        {appLayoutMode === 'default' && (
+          <LeftSidebar
+            isOpen={leftPanelOpen}
+            activeTab={activeLeftTab}
+            onTabChange={setActiveLeftTab}
+            content={content}
+            onContentChange={setContent}
+            fileTree={fileTree}
+            onFileClick={handleOpenFile}
+            onNavigate={handleNavigate}
+          />
+        )}
 
         {/* Center Canvas */}
         <div id="ndx-center-canvas" className="flex-1 flex min-w-0 bg-gray-900 relative">
 
           {/* Editor Pane */}
           <div id="ndx-editor-pane" className={`flex-1 flex flex-col min-w-0 border-r border-gray-800 transition-all duration-300 
-            ${focusedPane === 'preview' ? 'hidden' : ''} 
-            ${focusedPane === 'editor' ? 'flex-none w-full' : ''}`}
+            ${(focusedPane === 'preview' || appLayoutMode === 'fullscreen-visual') ? 'hidden' : ''} 
+            ${(focusedPane === 'editor' || appLayoutMode === 'fullscreen-code') ? 'flex-none w-full' : ''}`}
           >
             <Editor
               ref={textareaRef}
               value={content}
               onChange={setContent}
-              isFocused={focusedPane === 'editor'}
-              onToggleFocus={() => setFocusedPane(focusedPane === 'editor' ? 'none' : 'editor')}
+              isFocused={focusedPane === 'editor' || appLayoutMode === 'fullscreen-code'}
+              onToggleFocus={() => {
+                if (appLayoutMode === 'fullscreen-code') {
+                  setAppLayoutMode('default');
+                  setFocusedPane('none');
+                } else {
+                  setFocusedPane(focusedPane === 'editor' ? 'none' : 'editor');
+                }
+              }}
               onCursorMove={handleCursorMove}
               isActive={activeEditor === 'code'}
               onActivate={() => setActiveEditor('code')}
@@ -615,13 +877,20 @@ const App: React.FC = () => {
 
           {/* Preview Pane */}
           <div id="ndx-preview-pane" className={`flex-1 flex flex-col min-w-0 bg-white transition-all duration-300 
-            ${focusedPane === 'editor' ? 'hidden' : ''}
-            ${focusedPane === 'preview' ? 'flex-none w-full' : ''}`}
+            ${(focusedPane === 'editor' || appLayoutMode === 'fullscreen-code') ? 'hidden' : ''}
+            ${(focusedPane === 'preview' || appLayoutMode === 'fullscreen-visual') ? 'flex-none w-full' : ''}`}
           >
             <Preview
               content={content}
-              isFocused={focusedPane === 'preview'}
-              onToggleFocus={() => setFocusedPane(focusedPane === 'preview' ? 'none' : 'preview')}
+              isFocused={focusedPane === 'preview' || appLayoutMode === 'fullscreen-visual'}
+              onToggleFocus={() => {
+                if (appLayoutMode === 'fullscreen-visual') {
+                  setAppLayoutMode('default');
+                  setFocusedPane('none');
+                } else {
+                  setFocusedPane(focusedPane === 'preview' ? 'none' : 'preview');
+                }
+              }}
               customCss={cssContent}
               cursorOffset={cursorOffset}
               isActive={activeEditor === 'visual'}
@@ -751,6 +1020,11 @@ const App: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ProjectListModal
+        isOpen={isProjectListOpen}
+        onClose={() => setIsProjectListOpen(false)}
+        onSelectProject={handleSelectProject}
+      />
     </div>
   );
 };
