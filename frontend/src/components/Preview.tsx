@@ -135,6 +135,63 @@ const Preview: React.FC<PreviewProps> = ({
              notifyFocus();
           });
 
+          // --- Keydown Handling (Tab Trap & Function Keys) ---
+          window.addEventListener('keydown', (e) => {
+            // Forward Function Keys and Escape to Parent
+            if (['F9', 'F10', 'F11', 'Escape'].includes(e.key)) {
+              e.preventDefault();
+              e.stopPropagation();
+              window.parent.postMessage({ type: 'preview-keydown', key: e.key }, '*');
+              return;
+            }
+
+            if (e.key === 'Tab') {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              // Capture Source Map Position for Precise Resume
+              const sel = window.getSelection();
+              let sourcePos = null;
+
+              if (sel.rangeCount > 0) {
+                 const range = sel.getRangeAt(0);
+                 const startNode = range.startContainer;
+                 const startOffset = range.startOffset;
+
+                 // 1. Find nearest block with data-line class
+                 let current = startNode;
+                 let lineNum = -1;
+
+                 // Traverse up
+                 while (current && current !== document.body) {
+                   if (current.nodeType === 1) { // Element
+                     const el = current;
+                     // Check classList for data-line-X
+                     const lineClass = Array.from(el.classList).find(c => c.startsWith('data-line-'));
+                     if (lineClass) {
+                       lineNum = parseInt(lineClass.replace('data-line-', ''), 10);
+                       break;
+                     }
+                   }
+                   current = current.parentNode;
+                 }
+
+                 if (lineNum !== -1 && current) {
+                   // 2. Calculate offset relative to the start of this block
+                   // We need to count characters from the start of the block up to the caret
+                   const preCaretRange = range.cloneRange();
+                   preCaretRange.selectNodeContents(current);
+                   preCaretRange.setEnd(startNode, startOffset);
+                   const relativeOffset = preCaretRange.toString().length;
+                   
+                   sourcePos = { line: lineNum, offset: relativeOffset };
+                 }
+              }
+
+              window.parent.postMessage({ type: 'preview-tab', sourcePos }, '*');
+            }
+          });
+
           document.addEventListener('selectionchange', () => {
              const selection = document.getSelection();
              if (selection.rangeCount > 0) {
@@ -169,6 +226,19 @@ const Preview: React.FC<PreviewProps> = ({
               case 'set-cursor':
                 setCaretPosition(data.offset);
                 // Do not force focus here, as it steals focus from code editor during background sync
+                break;
+              case 'find-cursor-marker':
+                const marker = document.getElementById('ndx-cursor-marker');
+                if (marker) {
+                  const range = document.createRange();
+                  range.setStartBefore(marker);
+                  range.collapse(true);
+                  const sel = window.getSelection();
+                  sel.removeAllRanges();
+                  sel.addRange(range);
+                  marker.remove(); // Clean up
+                  marker.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }
                 break;
             }
           });
@@ -234,6 +304,21 @@ const Preview: React.FC<PreviewProps> = ({
       iframeRef.current.contentWindow?.focus();
     }
   }, [isActive, isEditing]);
+
+  // Initial Sync on Activation (Code -> Visual)
+  useEffect(() => {
+    if (isActive && isEditing && iframeLoaded && iframeRef.current) {
+      // We just switched to Visual Mode. 
+      // Render with the cursor marker to ensure precise positioning.
+      const html = convertToHtml(content, cursorOffset);
+      iframeRef.current.contentWindow?.postMessage({ type: 'update-content', html }, '*');
+
+      // Tell iframe to find the marker
+      setTimeout(() => {
+        iframeRef.current?.contentWindow?.postMessage({ type: 'find-cursor-marker' }, '*');
+      }, 50);
+    }
+  }, [isActive, isEditing, iframeLoaded]); // Dependencies ensure this runs when we switch modes
 
   // ... (rest of the component)
 

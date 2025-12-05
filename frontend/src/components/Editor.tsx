@@ -37,7 +37,7 @@ const Editor = forwardRef<HTMLTextAreaElement, EditorProps>(({ value, onChange, 
         onSelect={onCursorMove}
         onKeyUp={onCursorMove}
         onClick={onCursorMove}
-        className="w-full h-full p-6 bg-gray-900 text-gray-200 font-mono text-sm resize-none outline-none border-none leading-relaxed custom-scrollbar"
+        className="w-full h-full p-6 bg-gray-900 text-gray-100 font-mono text-sm resize-none outline-none border-none leading-relaxed custom-scrollbar"
         spellCheck={false}
         placeholder="Type your AsciiDoc here..."
       />

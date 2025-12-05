@@ -113,13 +113,14 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   return (
     <div id="ndx-left-sidebar" className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 transition-all duration-300">
       {/* Tabs */}
-      <div id="ndx-left-sidebar-tabs" className="h-6 flex bg-black border-b border-gray-800">
+      <div id="ndx-left-sidebar-tabs" className="h-6 flex border-b border-gray-800">
         <button id="ndx-left-sidebar-files-tab"
           onClick={() => onTabChange(LeftTab.FILES)}
           className={`flex-1 flex items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-wider transition-colors ${activeTab === LeftTab.FILES
             ? 'bg-gray-900 text-white border-b-2 border-indigo-500'
             : 'text-gray-600 hover:text-gray-400 hover:bg-gray-900'
             }`}
+          tabIndex={-1}
         >
           <Folder size={12} /> Files
         </button>
@@ -129,6 +130,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
             ? 'bg-gray-900 text-white border-b-2 border-indigo-500'
             : 'text-gray-600 hover:text-gray-400 hover:bg-gray-900'
             }`}
+          tabIndex={-1}
         >
           <ListTree size={12} /> Structure
         </button>
