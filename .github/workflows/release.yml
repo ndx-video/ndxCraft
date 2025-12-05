@@ -5,6 +5,8 @@ on:
       - "v*"
 env:
   CGO_ENABLED: 1
+permissions:
+  contents: write
 jobs:
   build:
     strategy:
