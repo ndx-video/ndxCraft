@@ -1,4 +1,4 @@
-
+// asciidocDef.ts
 import { languages } from 'monaco-editor';
 
 export const languageID = 'asciidoc';
@@ -9,90 +9,83 @@ export const conf: languages.LanguageConfiguration = {
     blockComment: ['////', '////'],
   },
   brackets: [
-    ['{', '}'],
-    ['[', ']'],
-    ['(', ')'],
-    ['<', '>'],
+    ['{', '}'], ['[', ']'], ['(', ')'], ['<', '>'],
   ],
   autoClosingPairs: [
-    { open: '{', close: '}' },
-    { open: '[', close: ']' },
-    { open: '(', close: ')' },
-    { open: '<', close: '>' },
-    { open: '"', close: '"' },
-    { open: "'", close: "'" },
-    { open: '`', close: '`' },
-    { open: '*', close: '*' },
+    { open: '{', close: '}' }, { open: '[', close: ']' },
+    { open: '(', close: ')' }, { open: '<', close: '>' },
+    { open: '"', close: '"' }, { open: "'", close: "'" },
+    { open: '`', close: '`' }, { open: '*', close: '*' },
     { open: '_', close: '_' },
   ],
   surroundingPairs: [
-    { open: '{', close: '}' },
-    { open: '[', close: ']' },
-    { open: '(', close: ')' },
-    { open: '<', close: '>' },
-    { open: '"', close: '"' },
-    { open: "'", close: "'" },
-    { open: '`', close: '`' },
-    { open: '*', close: '*' },
+    { open: '{', close: '}' }, { open: '[', close: ']' },
+    { open: '(', close: ')' }, { open: '<', close: '>' },
+    { open: '"', close: '"' }, { open: "'", close: "'" },
+    { open: '`', close: '`' }, { open: '*', close: '*' },
     { open: '_', close: '_' },
   ]
 };
 
 export const languageDef: languages.IMonarchLanguage = {
-  defaultToken: '',
+  defaultToken: 'text', // Default everything to plain text
   tokenPostfix: '.adoc',
 
-  // Control tokens
-  keywords: [],
-
-  // Define the tokenizer
   tokenizer: {
     root: [
-      // Headers: = Title, == Section (must be at start of line)
-      [/^=\s+.*$/, 'keyword.header.h1'],
-      [/^==\s+.*$/, 'keyword.header.h2'],
-      [/^===\s+.*$/, 'keyword.header.h3'],
-      [/^={4,6}\s+.*$/, 'keyword.header.other'],
+      // --- Headers ---
+      // Match the equals signs separately from the title text
+      [/^(=+)(\s+)(.*)$/, ['delimiter.header', '', 'keyword.header']],
 
-      // Lists: * item, . item, - item (must be at start of line)
-      [/^\s*[\*\.\-]+\s+/, 'keyword.list'],
+      // --- Lists ---
+      // Dim the bullet points (*, ., -)
+      [/^\s*[\*\.\-]+\s+/, 'delimiter.list'],
 
-      // Attributes: :name: value
-      [/^:\w[\w-]*:/, 'variable.attribute'],
+      // --- Attributes ---
+      // :name: value -> Dim the colons and name, highlight value slightly
+      [/^(:)([\w-]+)(:)/, ['delimiter.attribute', 'variable.attribute', 'delimiter.attribute']],
 
-      // Blocks (delimited)
-      [/^----+\s*$/, { token: 'delimiter.block.code', next: '@codeBlock' }],
-      [/^\.\.\.+\s*$/, { token: 'delimiter.block.literal', next: '@literalBlock' }],
-      [/^____+\s*$/, { token: 'delimiter.block.quote', next: '@quoteBlock' }],
-      [/^====+\s*$/, { token: 'delimiter.block.example', next: '@exampleBlock' }],
+      // --- Blocks (Fences) ---
+      // Dim the ---- lines
+      [/^----+\s*$/, { token: 'delimiter.block', next: '@codeBlock' }],
+      [/^\.\.\.+\s*$/, { token: 'delimiter.block', next: '@literalBlock' }],
+      [/^____+\s*$/, { token: 'delimiter.block', next: '@quoteBlock' }],
+      [/^====+\s*$/, { token: 'delimiter.block', next: '@exampleBlock' }],
 
-      // Comments
+      // --- Comments ---
       [/^\/\/\/\/+\s*$/, { token: 'comment', next: '@commentBlock' }],
       [/^\/\/.*$/, 'comment'],
 
-      // Formatting - using simple constrained matching
-      // We use lookahead-like logic by matching the delimiters and content
-      [/\*([^*]+)\*/, 'strong'],
-      [/_([^_]+)_/, 'emphasis'],
-      [/`([^`]+)`/, 'string.code'],
+      // --- Inline Formatting ---
+      // This is the magic part: Match delimiter, content, delimiter separately
+      // Bold *bold*
+      [/(\*)(\S[^*]*\S)(\*)/, ['delimiter.bold', 'strong', 'delimiter.bold']],
+      // Italic _italics_
+      [/(_)(\S[^_]*\S)(_)/, ['delimiter.italic', 'emphasis', 'delimiter.italic']],
+      // Monospace `code`
+      [/(`)([^`]+)(`)/, ['delimiter.code', 'string', 'delimiter.code']],
+
+      // Passthrough for other text
+      [/[^=*_`:\/\[\]]+/, 'text'],
     ],
 
-    // Block states
+    // --- Block States ---
+    // In blocks, we generally want the content to be brighter, fences dim
     codeBlock: [
-      [/^----+\s*$/, { token: 'delimiter.block.code', next: '@pop' }],
+      [/^----+\s*$/, { token: 'delimiter.block', next: '@pop' }],
       [/.*/, 'variable.source'],
     ],
     literalBlock: [
-      [/^\.\.\.+\s*$/, { token: 'delimiter.block.literal', next: '@pop' }],
-      [/.*/, 'string'],
+      [/^\.\.\.+\s*$/, { token: 'delimiter.block', next: '@pop' }],
+      [/.*/, 'text.literal'],
     ],
     quoteBlock: [
-      [/^____+\s*$/, { token: 'delimiter.block.quote', next: '@pop' }],
-      [/.*/, 'string'],
+      [/^____+\s*$/, { token: 'delimiter.block', next: '@pop' }],
+      [/.*/, 'text.quote'],
     ],
     exampleBlock: [
-      [/^====+\s*$/, { token: 'delimiter.block.example', next: '@pop' }],
-      [/.*/, 'string'],
+      [/^====+\s*$/, { token: 'delimiter.block', next: '@pop' }],
+      [/.*/, 'text.example'],
     ],
     commentBlock: [
       [/^\/\/\/\/+\s*$/, { token: 'comment', next: '@pop' }],

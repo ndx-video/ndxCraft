@@ -105,48 +105,48 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ defaultValue, onChange, 
     monaco.languages.setMonarchTokensProvider(languageID, languageDef);
     monaco.languages.setLanguageConfiguration(languageID, conf);
 
-    // Define and apply Hack The Box theme
-    monaco.editor.defineTheme('hack-the-box', {
+    // Define and apply Technical Writer theme
+    monaco.editor.defineTheme('technical-writer', {
       base: 'vs-dark',
       inherit: true,
       rules: [
-        { token: 'comment', foreground: 'D7E4FF46', fontStyle: 'italic' },
-        { token: 'string', foreground: 'C5F467' },
-        { token: 'keyword', foreground: 'FF8484' },
-        { token: 'number', foreground: '5CB2FF' },
-        { token: 'type', foreground: 'FF8484' },
-        { token: 'class', foreground: 'FF8484' },
-        { token: 'function', foreground: 'FFCC5C' },
-        { token: 'variable', foreground: 'A4B1CD' },
-        { token: 'constant', foreground: '5CB2FF' },
-        { token: 'delimiter', foreground: 'A4B1CD' },
-        { token: 'tag', foreground: 'FF8484' },
-        { token: 'attribute.name', foreground: '5CB2FF' },
-        { token: 'attribute.value', foreground: 'C5F467' },
+        // 1. Catch-all: Soft blue-gray text (#a6accd), no bold.
+        // This overrides all default vs-dark colors.
+        { token: '', foreground: 'a6accd', fontStyle: '' },
 
-        // AsciiDoc specific
-        { token: 'keyword.header.h1', foreground: 'FF8484', fontStyle: 'bold' },
-        { token: 'keyword.header.h2', foreground: 'FFCC5C', fontStyle: 'bold' },
-        { token: 'keyword.header.h3', foreground: '5CB2FF', fontStyle: 'bold' },
-        { token: 'keyword.header', foreground: 'FF8484', fontStyle: 'bold' },
-        { token: 'keyword.list', foreground: '5CB2FF' },
-        { token: 'variable.attribute', foreground: '5CB2FF' },
-        { token: 'strong', fontStyle: 'bold', foreground: 'A4B1CD' },
-        { token: 'emphasis', fontStyle: 'italic', foreground: 'A4B1CD' },
-        { token: 'string.code', foreground: 'C5F467' },
+        // 2. Comments: Darker gray/blue (#555b6b), subtle italic
+        { token: 'comment', foreground: '555b6b', fontStyle: 'italic' },
+
+        // 3. Headers: Soft Blue (#7aa2f7), Bold
+        { token: 'keyword.header', foreground: '7aa2f7', fontStyle: 'bold' },
+
+        // 4. Delimiters/Symbols: Deep gray (#414863) (fade into background)
+        { token: 'delimiter', foreground: '414863' },
+
+        // 5. Formatting:
+        // Bold: Whiter/Brighter (#e0e6f0)
+        { token: 'strong', foreground: 'e0e6f0', fontStyle: 'bold' },
+        // Emphasis: Whiter/Brighter (#e0e6f0)
+        { token: 'emphasis', foreground: 'e0e6f0', fontStyle: 'italic' },
+        // Code: Soft peach/orange (#cfc9c2) (subtle)
+        { token: 'string', foreground: 'cfc9c2' },
+
+        // 6. Attributes: Same as base text
+        { token: 'variable.attribute', foreground: 'a6accd' },
       ],
       colors: {
-        'editor.background': '#141d2b',
-        'editor.foreground': '#a4b1cd',
-        'editor.selectionBackground': '#6e7b968C',
-        'editor.lineHighlightBackground': '#1a2332',
-        'editorCursor.foreground': '#9fef00',
-        'editorWhitespace.foreground': '#313f55',
-        'editorIndentGuide.background': '#313f55',
-        'editorIndentGuide.activeBackground': '#a4b1cd',
+        'editor.background': '#13151a', // Deep dark blue/black (reduced fatigue)
+        'editor.foreground': '#a6accd', // Soft blue-gray
+        'editor.selectionBackground': '#2f3b5440',
+        'editor.lineHighlightBackground': '#1b1e2e',
+        'editorCursor.foreground': '#7aa2f7',
+        'editorWhitespace.foreground': '#3b4048',
+        'editorIndentGuide.background': '#2c313a',
+        'editorIndentGuide.activeBackground': '#454c59',
       }
     });
-    monaco.editor.setTheme('hack-the-box');
+    monaco.editor.setTheme('technical-writer');
+
 
     editor.onDidChangeCursorPosition((e) => {
       if (onCursorChangeRef.current) {
@@ -173,10 +173,11 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ defaultValue, onChange, 
         {isFocused ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
       </button>
 
+
       <MonacoEditor
         height="100%"
         language={languageID}
-        theme="hack-the-box"
+        theme="technical-writer"
         defaultValue={defaultValue}
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
