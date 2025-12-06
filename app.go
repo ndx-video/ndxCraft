@@ -85,6 +85,27 @@ func (a *App) SelectDirectory() (string, error) {
 	})
 }
 
+// SelectExecutable opens a file dialog to select an executable
+func (a *App) SelectExecutable() (string, error) {
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select Git Client",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Executables", Pattern: "*.exe;*.cmd;*.bat;*.sh;*.app"},
+			{DisplayName: "All Files", Pattern: "*.*"},
+		},
+	})
+}
+
+// SelectSvgFile opens a file dialog for SVG files
+func (a *App) SelectSvgFile() (string, error) {
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select Icon (SVG)",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "SVG Files", Pattern: "*.svg"},
+		},
+	})
+}
+
 // GenerateContent generates AsciiDoc content using Gemini
 func (a *App) GenerateContent(prompt string, contextText string) (string, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -204,10 +225,14 @@ func (a *App) readDirRecursive(dirPath string) ([]*FileNode, error) {
 		return nil, err
 	}
 
+	// Check showHiddenFiles preference
+	showHiddenRaw, _ := a.GetPreference("showHiddenFiles")
+	showHidden, _ := showHiddenRaw.(bool)
+
 	var nodes []*FileNode
 	for _, entry := range entries {
-		// Skip hidden files/dirs
-		if strings.HasPrefix(entry.Name(), ".") {
+		// Skip hidden files/dirs unless preference is set
+		if !showHidden && strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 
@@ -269,20 +294,53 @@ func (a *App) ListFiles(dirPath string) ([]string, error) {
 	return files, nil
 }
 
-// OpenGitHubDesktop attempts to open the repository at the given path in GitHub Desktop
-func (a *App) OpenGitHubDesktop(path string) (bool, error) {
-	// Check registry for x-github-client protocol
-	cmd := exec.Command("reg", "query", "HKCR\\x-github-client")
-	if err := cmd.Run(); err != nil {
-		return false, nil
-	}
-
+// OpenGitClient opens the repository in the configured git client
+func (a *App) OpenGitClient(path string) (bool, error) {
 	if path == "" {
 		var err error
 		path, err = os.Getwd()
 		if err != nil {
 			return true, err
 		}
+	}
+
+	// Get preferences
+	clientPathRaw, _ := a.GetPreference("git_client_path")
+	clientArgsRaw, _ := a.GetPreference("git_client_args")
+
+	clientPath, _ := clientPathRaw.(string)
+	clientArgs, _ := clientArgsRaw.(string)
+
+	if clientPath != "" {
+		// Custom Client
+		// Variable Substitution
+		// Supported: %project_path%
+		args := clientArgs
+		if args == "" {
+			args = "%project_path%"
+		}
+
+		finalArgs := strings.ReplaceAll(args, "%project_path%", path)
+
+		// Parse args string into slice is tricky if not using shell.
+		// For simplicity, let's assume simple space separation or use a proper parser if needed.
+		// Windows paths might have spaces too.
+		// Let's try to just run the command directly if we can, or split by space.
+		// Better: use "cmd /C start ..." or just exec.
+
+		// Simple split for now, maybe improve later if user complains about quoted args
+		argSlice := strings.Fields(finalArgs)
+
+		cmd := exec.Command(clientPath, argSlice...)
+		err := cmd.Start() // Don't wait
+		return true, err
+	}
+
+	// Fallback to GitHub Desktop legacy logic
+	// Check registry for x-github-client protocol
+	cmd := exec.Command("reg", "query", "HKCR\\x-github-client")
+	if err := cmd.Run(); err != nil {
+		return false, nil // Protocol not found
 	}
 
 	// Try to get remote URL first
@@ -425,4 +483,27 @@ func (a *App) GetDefaultProjectRoot() (string, error) {
 		return "", err
 	}
 	return filepath.Join(cwd, "docsCraft"), nil
+}
+
+// Git Icon Bindings
+
+func (a *App) AddGitIcon(svg string) (string, error) {
+	if db == nil {
+		return "", fmt.Errorf("database not initialized")
+	}
+	return db.AddGitIcon(svg)
+}
+
+func (a *App) GetGitIcons() (map[string]string, error) {
+	if db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	return db.GetGitIcons()
+}
+
+func (a *App) DeleteGitIcon(id string) error {
+	if db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	return db.DeleteGitIcon(id)
 }

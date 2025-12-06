@@ -8,7 +8,7 @@
 import React from 'react';
 import {
   Bold, Italic, Heading, List, ListOrdered, Link, Image,
-  Code, Table, Wand2, Eraser, Download, Upload, Settings, Github, Folder
+  Code, Table, Wand2, Eraser, Download, Upload, Settings, Github, Folder, Undo, Redo
 } from 'lucide-react';
 
 interface ToolbarProps {
@@ -19,9 +19,12 @@ interface ToolbarProps {
   onSettings: () => void;
   onGitHub: () => void;
   onProjectList: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  gitIcon?: string;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave, onSettings, onGitHub, onProjectList }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave, onSettings, onGitHub, onProjectList, onUndo, onRedo, gitIcon }) => {
 
   const Btn = ({ icon: Icon, label, onClick, id }: { icon: any, label: string, onClick: () => void, id?: string }) => (
     <button
@@ -46,6 +49,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave
         <Btn id="ndx-toolbar-open" icon={Upload} label="Open File" onClick={onOpen} />
         <Btn id="ndx-toolbar-save" icon={Download} label="Save File" onClick={onSave} />
         <div className="w-px h-6 bg-gray-600 mx-2" />
+        <Btn id="ndx-toolbar-undo" icon={Undo} label="Undo" onClick={onUndo} />
+        <Btn id="ndx-toolbar-redo" icon={Redo} label="Redo" onClick={onRedo} />
         <Btn id="ndx-toolbar-heading" icon={Heading} label="Heading" onClick={() => onInsert('\n== Heading\n', 12)} />
         <Btn id="ndx-toolbar-bold" icon={Bold} label="Bold" onClick={() => onInsert('*bold text*', 1)} />
         <Btn id="ndx-toolbar-italic" icon={Italic} label="Italic" onClick={() => onInsert('_italic text_', 1)} />
@@ -63,10 +68,17 @@ const Toolbar: React.FC<ToolbarProps> = ({ onInsert, onAIRequest, onOpen, onSave
           id="ndx-toolbar-github"
           onClick={onGitHub}
           className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
-          title="Open in GitHub Desktop"
+          title="Open in Git Client"
           tabIndex={-1}
         >
-          <Github size={20} />
+          {gitIcon ? (
+            <div
+              className="w-5 h-5 [&>svg]:w-full [&>svg]:h-full"
+              dangerouslySetInnerHTML={{ __html: gitIcon }}
+            />
+          ) : (
+            <Github size={20} />
+          )}
         </button>
         <button
           id="ndx-toolbar-settings"

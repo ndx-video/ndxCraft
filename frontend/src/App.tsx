@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import Toolbar from './components/Toolbar';
 import Editor, { EditorHandle } from './components/Editor';
 import Preview from './components/Preview';
@@ -8,7 +9,7 @@ import PreferencesModal from './components/PreferencesModal';
 import { EditorMode, LeftTab, FileNode } from './types';
 import { Sidebar, PanelRight, Circle } from 'lucide-react';
 import ProjectListModal from './components/ProjectListModal';
-import { ReadFile, SaveFile, SelectFile, SelectSaveFile, ListFiles, OpenGitHubDesktop, OpenBrowser, SaveShadowFile, GetShadowFile, SaveAppState, GetAppState, HasCorruption, RestoreBackup, GetFileTree, ClearShadowFile, UpdateProjectLastOpened, GetDefaultProjectRoot, GetPreference, AddProject } from '../wailsjs/go/main/App';
+import { ReadFile, SaveFile, SelectFile, SelectSaveFile, ListFiles, OpenGitClient, OpenBrowser, SaveShadowFile, GetShadowFile, SaveAppState, GetAppState, HasCorruption, RestoreBackup, GetFileTree, ClearShadowFile, UpdateProjectLastOpened, GetDefaultProjectRoot, GetPreference, AddProject, GetGitIcons } from '../wailsjs/go/main/App';
 import { WindowFullscreen, WindowUnfullscreen, WindowIsFullscreen } from '../wailsjs/runtime/runtime';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,7 @@ const App: React.FC = () => {
 
   const [projectRoot, setProjectRoot] = useState<string>('');
   const [isProjectListOpen, setIsProjectListOpen] = useState(false);
+  const [gitIconSvg, setGitIconSvg] = useState<string | undefined>(undefined);
 
   // Unsaved Changes Dialog State
   const [pendingFileToOpen, setPendingFileToOpen] = useState<string | null>(null);
@@ -98,6 +100,18 @@ const App: React.FC = () => {
         }
         if (root) {
           setProjectRoot(root);
+        }
+
+        // Load Git Icon
+        const iconIdRaw = await GetPreference("git_client_icon_id");
+        if (iconIdRaw) {
+          const iconId = iconIdRaw as string;
+          try {
+            const icons = await GetGitIcons();
+            if (icons && icons[iconId]) {
+              setGitIconSvg(icons[iconId]);
+            }
+          } catch (e) { console.error(e); }
         }
 
         const lastFile = await GetAppState("lastFile");
@@ -403,6 +417,26 @@ const App: React.FC = () => {
         return;
       }
 
+      // Ctrl+Z: Undo / Redo (Global)
+      if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+        // We only want to handle this if NOT in an input/iframe, OR if we want to override default behavior?
+        // Usually, inputs handle their own Undo. We want to catch it when focus is "lost" or on body/buttons.
+        const active = document.activeElement;
+        const isInput = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active?.getAttribute('contenteditable') === 'true';
+        const isIframe = active instanceof HTMLIFrameElement;
+
+        if (!isInput && !isIframe) {
+          e.preventDefault();
+          if (e.shiftKey) {
+            editorRef.current?.redo();
+          } else {
+            editorRef.current?.undo();
+          }
+          setTimeout(() => editorRef.current?.focus(), 0);
+          return;
+        }
+      }
+
       // Ignore if modifier keys are pressed (Ctrl, Alt, Meta)
       if (e.ctrlKey || e.altKey || e.metaKey) return;
 
@@ -425,6 +459,8 @@ const App: React.FC = () => {
         }
       }
     };
+
+
 
     window.addEventListener('keydown', handleGlobalKeyDown, true); // Use capture to intercept before others
     return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
@@ -670,15 +706,15 @@ const App: React.FC = () => {
   const handleGitHub = async () => {
     try {
       // @ts-ignore
-      const installed = await OpenGitHubDesktop(projectRoot);
+      const installed = await OpenGitClient(projectRoot);
       if (!installed) {
-        if (confirm("GitHub Desktop is not installed. Would you like to download it?")) {
+        if (confirm("Git Client not found or protocol not supported. Defaulting to GitHub Desktop check. Download GitHub Desktop?")) {
           // @ts-ignore
           await OpenBrowser("https://desktop.github.com/");
         }
       }
     } catch (err) {
-      console.error("Failed to open GitHub Desktop", err);
+      console.error("Failed to open Git Client", err);
       alert("Error: " + err);
     }
   };
@@ -724,6 +760,20 @@ const App: React.FC = () => {
       await UpdateProjectLastOpened(path);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleUndo = () => {
+    if (editorRef.current) {
+      editorRef.current.undo();
+      editorRef.current.focus();
+    }
+  };
+
+  const handleRedo = () => {
+    if (editorRef.current) {
+      editorRef.current.redo();
+      editorRef.current.focus();
     }
   };
 
@@ -793,89 +843,117 @@ const App: React.FC = () => {
           onSettings={() => setIsPreferencesOpen(true)}
           onGitHub={handleGitHub}
           onProjectList={handleProjectList}
+          gitIcon={gitIconSvg}
         />
       )}
 
       {/* Main Workspace */}
       <div id="ndx-main-workspace" className="flex-1 flex overflow-hidden relative">
+        <PanelGroup direction="horizontal" autoSaveId="ndx-main-layout">
 
-        {appLayoutMode === 'default' && (
-          <LeftSidebar
-            isOpen={leftPanelOpen}
-            activeTab={activeLeftTab}
-            onTabChange={setActiveLeftTab}
-            content={content}
-            onContentChange={(newContent) => {
-              setContent(newContent);
-              editorRef.current?.setValue(newContent);
-            }}
-            fileTree={fileTree}
-            onFileClick={handleOpenFile}
-            onNavigate={handleNavigate}
-          />
-        )}
+          {/* Left Sidebar Panel */}
+          {appLayoutMode === 'default' && leftPanelOpen && (
+            <>
+              <Panel defaultSize={20} minSize={10} maxSize={40} id="left-panel" order={1}>
+                <LeftSidebar
+                  isOpen={leftPanelOpen}
+                  activeTab={activeLeftTab}
+                  onTabChange={setActiveLeftTab}
+                  content={content}
+                  onContentChange={(newContent) => {
+                    setContent(newContent);
+                    editorRef.current?.setValue(newContent);
+                  }}
+                  fileTree={fileTree}
+                  onFileClick={handleOpenFile}
+                  onNavigate={handleNavigate}
+                />
+              </Panel>
+              <PanelResizeHandle className="w-1 bg-gray-800 hover:bg-indigo-500 transition-colors z-10" />
+            </>
+          )}
 
-        {/* Center Canvas */}
-        <div id="ndx-center-canvas" className="flex-1 flex min-w-0 bg-gray-900 relative">
+          {/* Center Canvas Panel */}
+          <Panel order={2} id="center-panel" minSize={20}>
+            <PanelGroup direction="horizontal" autoSaveId="ndx-center-layout">
 
-          {/* Editor Pane */}
-          <div id="ndx-editor-pane" className={`flex-1 flex flex-col min-w-0 border-r border-gray-800 transition-all duration-300 
-            ${(focusedPane === 'preview' || appLayoutMode === 'fullscreen-visual') ? 'hidden' : ''} 
-            ${(focusedPane === 'editor' || appLayoutMode === 'fullscreen-code') ? 'flex-none w-full' : ''}`}
-          >
-            <Editor
-              ref={editorRef}
-              defaultValue={INITIAL_CONTENT}
-              onChange={setContent}
-              isFocused={focusedPane === 'editor' || appLayoutMode === 'fullscreen-code'}
-              onToggleFocus={() => {
-                if (appLayoutMode === 'fullscreen-code') {
-                  setAppLayoutMode('default');
-                  setFocusedPane('none');
-                } else {
-                  setFocusedPane(focusedPane === 'editor' ? 'none' : 'editor');
-                }
-              }}
-              onCursorChange={handleCursorMove}
-            />
-          </div>
+              {/* Editor Panel */}
+              {(!focusedPane || focusedPane === 'editor' || focusedPane === 'none') && appLayoutMode !== 'fullscreen-visual' && (
+                <Panel order={1} id="editor-panel" minSize={10} defaultSize={50} className="flex flex-col">
+                  <div id="ndx-editor-pane" className="flex-1 flex flex-col min-w-0 h-full">
+                    <Editor
+                      ref={editorRef}
+                      defaultValue={INITIAL_CONTENT}
+                      onChange={setContent}
+                      isFocused={focusedPane === 'editor' || appLayoutMode === 'fullscreen-code'}
+                      onToggleFocus={() => {
+                        if (appLayoutMode === 'fullscreen-code') {
+                          setAppLayoutMode('default');
+                          setFocusedPane('none');
+                        } else {
+                          setFocusedPane(focusedPane === 'editor' ? 'none' : 'editor');
+                        }
+                      }}
+                      onCursorChange={handleCursorMove}
+                    />
+                  </div>
+                </Panel>
+              )}
 
-          {/* Preview Pane */}
-          <div id="ndx-preview-pane" className={`flex-1 flex flex-col min-w-0 bg-white transition-all duration-300 
-            ${(focusedPane === 'editor' || appLayoutMode === 'fullscreen-code') ? 'hidden' : ''}
-            ${(focusedPane === 'preview' || appLayoutMode === 'fullscreen-visual') ? 'flex-none w-full' : ''}`}
-          >
-            <Preview
-              content={content}
-              isFocused={focusedPane === 'preview' || appLayoutMode === 'fullscreen-visual'}
-              onToggleFocus={() => {
-                if (appLayoutMode === 'fullscreen-visual') {
-                  setAppLayoutMode('default');
-                  setFocusedPane('none');
-                } else {
-                  setFocusedPane(focusedPane === 'preview' ? 'none' : 'preview');
-                }
-              }}
-              cursorLine={cursorLine}
-              isActive={activeEditor === 'visual'}
-              onActivate={() => setActiveEditor('visual')}
-              focusTrigger={focusTrigger}
-              isEditing={isVisualEditEnabled}
-              onToggleEditing={() => setIsVisualEditEnabled(!isVisualEditEnabled)}
-            />
-          </div>
+              {/* Resizer between Editor and Preview */}
+              {/* Only show handle if BOTH are visible */}
+              {((!focusedPane || focusedPane === 'editor' || focusedPane === 'none') && appLayoutMode !== 'fullscreen-visual') &&
+                ((!focusedPane || focusedPane === 'preview' || focusedPane === 'none') && appLayoutMode !== 'fullscreen-code') && (
+                  <PanelResizeHandle className="w-1 bg-gray-800 hover:bg-indigo-500 transition-colors z-10" />
+                )}
 
-        </div>
+              {/* Preview Pane */}
+              {(!focusedPane || focusedPane === 'preview' || focusedPane === 'none') && appLayoutMode !== 'fullscreen-code' && (
+                <Panel order={2} id="preview-panel" minSize={10} defaultSize={50} className="flex flex-col">
+                  <div id="ndx-preview-pane" className="flex-1 flex flex-col min-w-0 h-full bg-white">
+                    <Preview
+                      content={content}
+                      isFocused={focusedPane === 'preview' || appLayoutMode === 'fullscreen-visual'}
+                      onToggleFocus={() => {
+                        if (appLayoutMode === 'fullscreen-visual') {
+                          setAppLayoutMode('default');
+                          setFocusedPane('none');
+                        } else {
+                          setFocusedPane(focusedPane === 'preview' ? 'none' : 'preview');
+                        }
+                      }}
+                      cursorLine={cursorLine}
+                      isActive={activeEditor === 'visual'}
+                      onActivate={() => setActiveEditor('visual')}
+                      focusTrigger={focusTrigger}
+                      isEditing={isVisualEditEnabled}
+                      onToggleEditing={() => setIsVisualEditEnabled(!isVisualEditEnabled)}
+                    />
+                  </div>
+                </Panel>
+              )}
 
-        {/* Right Panel (Slide Out) */}
-        {rightPanelOpen && (
-          <AIAssistant
-            isOpen={rightPanelOpen}
-            onClose={() => setRightPanelOpen(false)}
-            currentContent={content}
-            onApply={handleAIApply}
-          />
-        )}
+            </PanelGroup>
+          </Panel>
+
+          {/* Right Panel (AIAssistant) */}
+          {rightPanelOpen && (
+            <>
+              <PanelResizeHandle className="w-1 bg-gray-800 hover:bg-indigo-500 transition-colors z-10" />
+              <Panel defaultSize={20} minSize={10} maxSize={40} id="right-panel" order={3}>
+                <div className="h-full w-full bg-gray-900">
+                  <AIAssistant
+                    isOpen={rightPanelOpen}
+                    onClose={() => setRightPanelOpen(false)}
+                    currentContent={content}
+                    onApply={handleAIApply}
+                  />
+                </div>
+              </Panel>
+            </>
+          )}
+
+        </PanelGroup>
       </div>
 
       {/* Footer */}
@@ -897,6 +975,21 @@ const App: React.FC = () => {
         onClose={() => setIsPreferencesOpen(false)}
         projectRoot={projectRoot}
         onProjectRootChange={setProjectRoot}
+        onPreferencesChanged={async () => {
+          // Reload Git Icon
+          const iconIdRaw = await GetPreference("git_client_icon_id");
+          if (iconIdRaw) {
+            const iconId = iconIdRaw as string;
+            try {
+              const icons = await GetGitIcons();
+              if (icons && icons[iconId]) {
+                setGitIconSvg(icons[iconId]);
+              } else if (iconId === 'default') {
+                setGitIconSvg(undefined);
+              }
+            } catch (e) { console.error(e); }
+          }
+        }}
       />
 
       <Dialog open={isUnsavedDialogOpen} onOpenChange={setIsUnsavedDialogOpen}>

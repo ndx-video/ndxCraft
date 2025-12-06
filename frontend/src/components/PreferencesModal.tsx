@@ -19,8 +19,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Settings, Monitor, Keyboard, Type, Palette, FolderOpen } from 'lucide-react';
-import { SelectDirectory, GetAllPreferences, SavePreference } from '../../wailsjs/go/main/App';
+import { Settings, Monitor, Keyboard, Type, Palette, FolderOpen, GitBranch, Plus, Trash2 } from 'lucide-react';
+import { SelectDirectory, GetAllPreferences, SavePreference, SelectFile, GetGitIcons, SelectExecutable, SelectSvgFile, ReadFile, AddGitIcon, DeleteGitIcon } from '../../wailsjs/go/main/App';
 
 interface PreferencesModalProps {
   isOpen: boolean;
@@ -33,16 +33,37 @@ interface PreferencesModalProps {
 const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, projectRoot, onProjectRootChange, onPreferencesChanged }) => {
   const [autoSave, setAutoSave] = React.useState(true);
   const [spellCheck, setSpellCheck] = React.useState(true);
+  const [showHiddenFiles, setShowHiddenFiles] = React.useState(false);
+
   const [fontFamily, setFontFamily] = React.useState("Inter, sans-serif");
   const [fontSize, setFontSize] = React.useState(16);
   const [lineHeight, setLineHeight] = React.useState(1.6);
   const [theme, setTheme] = React.useState("Midnight");
 
+  // Git Settings
+  const [gitClientPath, setGitClientPath] = React.useState("");
+  const [gitClientArgs, setGitClientArgs] = React.useState("%project_path%");
+  const [gitClientIconId, setGitClientIconId] = React.useState("default");
+
+  const [availableIcons, setAvailableIcons] = React.useState<Record<string, string>>({});
+
+  const argsInputRef = React.useRef<HTMLInputElement>(null);
+
   React.useEffect(() => {
     if (isOpen) {
       loadPreferences();
+      loadIcons();
     }
   }, [isOpen]);
+
+  const loadIcons = async () => {
+    try {
+      const icons = await GetGitIcons();
+      setAvailableIcons(icons || {});
+    } catch (err) {
+      console.error("Failed to load git icons", err);
+    }
+  };
 
   const loadPreferences = async () => {
     try {
@@ -50,11 +71,16 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
       if (prefs) {
         if (prefs.autoSave !== undefined) setAutoSave(prefs.autoSave as boolean);
         if (prefs.spellCheck !== undefined) setSpellCheck(prefs.spellCheck as boolean);
+        if (prefs.showHiddenFiles !== undefined) setShowHiddenFiles(prefs.showHiddenFiles as boolean);
+
         if (prefs.fontFamily) setFontFamily(prefs.fontFamily as string);
         if (prefs.fontSize) setFontSize(Number(prefs.fontSize));
         if (prefs.lineHeight) setLineHeight(Number(prefs.lineHeight));
         if (prefs.theme) setTheme(prefs.theme as string);
-        // projectRoot is handled via props/App state, but we could load it here too if needed
+
+        if (prefs.git_client_path) setGitClientPath(prefs.git_client_path as string);
+        if (prefs.git_client_args) setGitClientArgs(prefs.git_client_args as string);
+        if (prefs.git_client_icon_id) setGitClientIconId(prefs.git_client_icon_id as string);
       }
     } catch (err) {
       console.error("Failed to load preferences", err);
@@ -65,10 +91,16 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
     try {
       await SavePreference("autoSave", autoSave);
       await SavePreference("spellCheck", spellCheck);
+      await SavePreference("showHiddenFiles", showHiddenFiles);
+
       await SavePreference("fontFamily", fontFamily);
       await SavePreference("fontSize", fontSize);
       await SavePreference("lineHeight", lineHeight);
       await SavePreference("theme", theme);
+
+      await SavePreference("git_client_path", gitClientPath);
+      await SavePreference("git_client_args", gitClientArgs);
+      await SavePreference("git_client_icon_id", gitClientIconId);
 
       // projectRoot is saved via App when it changes, or we can save it here if we want to be sure
       await SavePreference("projectRoot", projectRoot);
@@ -91,6 +123,80 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
     }
   };
 
+  const handleBrowseGitClient = async () => {
+    try {
+      const path = await SelectExecutable();
+      if (path) {
+        setGitClientPath(path);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleVariableClick = (variable: string) => {
+    if (argsInputRef.current) {
+      const input = argsInputRef.current;
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+
+      let newText = gitClientArgs;
+      if (start !== null && end !== null) {
+        newText = gitClientArgs.substring(0, start) + variable + gitClientArgs.substring(end);
+        setGitClientArgs(newText);
+
+        // Restore focus and cursor
+        setTimeout(() => {
+          input.focus();
+          const newCursorPos = start + variable.length;
+          input.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+      } else {
+        setGitClientArgs(prev => prev + variable);
+        input.focus();
+      }
+    } else {
+      setGitClientArgs(prev => prev + variable);
+    }
+  };
+
+  const handleAddIcon = async () => {
+    try {
+      const path = await SelectSvgFile();
+      if (!path) return;
+
+      const content = await ReadFile(path);
+      if (!content.trim().startsWith("<svg") && !content.includes("http://www.w3.org/2000/svg")) {
+        alert("Selected file does not appear to be a valid SVG");
+        return;
+      }
+
+      await AddGitIcon(content);
+      loadIcons();
+    } catch (err: any) {
+      console.error("Failed to add icon", err);
+      alert(err.message || "Failed to add icon");
+    }
+  };
+
+  const handleDeleteIcon = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      if (['default', 'tower', 'gitlab'].includes(id)) {
+        alert("Cannot delete default icons");
+        return;
+      }
+      if (id === gitClientIconId) {
+        setGitClientIconId("default");
+      }
+      await DeleteGitIcon(id);
+      loadIcons();
+    } catch (err) {
+      console.error("Failed to delete icon", err);
+      alert("Failed to delete icon");
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] bg-gray-950 border-gray-800 text-gray-100 shadow-2xl shadow-indigo-500/10 backdrop-blur-xl">
@@ -104,7 +210,7 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
         </DialogHeader>
 
         <Tabs defaultValue="general" className="w-full mt-4">
-          <TabsList id="ndx-prefs-tabs-list" className="grid w-full grid-cols-4 bg-gray-900/50 p-1">
+          <TabsList id="ndx-prefs-tabs-list" className="grid w-full grid-cols-5 bg-gray-900/50 p-1">
             <TabsTrigger id="ndx-prefs-tab-general" value="general" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
               <Monitor className="w-4 h-4 mr-2" /> General
             </TabsTrigger>
@@ -113,6 +219,9 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
             </TabsTrigger>
             <TabsTrigger id="ndx-prefs-tab-theme" value="theme" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
               <Palette className="w-4 h-4 mr-2" /> Theme
+            </TabsTrigger>
+            <TabsTrigger id="ndx-prefs-tab-git" value="git" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
+              <GitBranch className="w-4 h-4 mr-2" /> Git
             </TabsTrigger>
             <TabsTrigger id="ndx-prefs-tab-shortcuts" value="shortcuts" className="data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-400">
               <Keyboard className="w-4 h-4 mr-2" /> Shortcuts
@@ -135,7 +244,7 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
                       readOnly
                       className="bg-gray-900 border-gray-700 text-gray-400 font-mono text-sm"
                     />
-                    <Button onClick={handleBrowseRoot} variant="outline" className="border-gray-700 hover:bg-gray-800">
+                    <Button onClick={handleBrowseRoot} variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white">
                       <FolderOpen className="w-4 h-4 mr-2" /> Browse
                     </Button>
                   </div>
@@ -155,6 +264,14 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
                     <p className="text-sm text-gray-500">Highlight spelling errors as you type.</p>
                   </div>
                   <Switch id="ndx-prefs-spellcheck" checked={spellCheck} onCheckedChange={setSpellCheck} className="data-[state=checked]:bg-indigo-600" />
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-lg bg-gray-900/30 border border-gray-800 hover:border-indigo-500/30 transition-colors">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium text-gray-200">Show Hidden Files</Label>
+                    <p className="text-sm text-gray-500">Show dotfiles in the file explorer.</p>
+                  </div>
+                  <Switch id="ndx-prefs-hidden-files" checked={showHiddenFiles} onCheckedChange={setShowHiddenFiles} className="data-[state=checked]:bg-indigo-600" />
                 </div>
               </div>
             </TabsContent>
@@ -222,6 +339,98 @@ const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, pr
                     )}
                   </div>
                 ))}
+              </div>
+            </TabsContent>
+
+            {/* Git Tab */}
+            <TabsContent value="git" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div id="git-client-area" className="space-y-4">
+                <div id="git-client-path-area" className="p-0">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium text-gray-200">Git Client Path</Label>
+                    <p className="text-sm text-gray-500">Path to your preferred Git executable (e.g., Git Tower, SourceTree). Leave empty for default.</p>
+                  </div>
+                  <div id="git-client-path" className="flex gap-2">
+                    <Input
+                      value={gitClientPath}
+                      onChange={(e) => setGitClientPath(e.target.value)}
+                      placeholder="e.g., C:\Program Files\Git Tower\Git Tower.exe"
+                      className="bg-gray-900 border-gray-700 text-gray-200 font-mono text-sm"
+                    />
+                    <Button onClick={handleBrowseGitClient} variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white">
+                      <FolderOpen className="w-4 h-4 mr-2" /> Browse
+                    </Button>
+                  </div>
+                </div>
+
+                <div id="git-client-args" className="p-0">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium text-gray-200">launch Arguments</Label>
+                    <p className="text-sm text-gray-500">Arguments to pass to the client.</p>
+                  </div>
+                  <Input
+                    ref={argsInputRef}
+                    value={gitClientArgs}
+                    onChange={(e) => setGitClientArgs(e.target.value)}
+                    placeholder="%project_path%"
+                    className="bg-gray-900 border-gray-700 text-gray-200 font-mono text-sm"
+                  />
+                  <div className="text-xs text-gray-500">
+                    Available variables:
+                    <span
+                      className="text-indigo-400 cursor-pointer hover:underline ml-1"
+                      onClick={() => handleVariableClick("%project_path%")}
+                      title="Click to insert"
+                    >
+                      %project_path%
+                    </span>
+                  </div>
+                </div>
+
+                <div id="toolbar-icon-area" className="p-0 rounded-lg">
+                  <div id="toolbar-icon-header" className="space-y-0.5">
+                    <Label className="text-base font-medium text-gray-200">Toolbar Icon</Label>
+                    <p className="text-sm text-gray-500">Select the icon to display in the toolbar or add your own SVG.</p>
+                  </div>
+
+                  <div id="toolbar-icon-grid" className="grid grid-cols-6 gap-2 h-200 overflow-y-auto p-0 rounded-lg border-gray-800">
+                    {Object.entries(availableIcons).map(([id, svg]) => (
+                      <div
+                        key={id}
+                        onClick={() => setGitClientIconId(id)}
+                        className={`
+                          flex items-center justify-center p-0 rounded-lg cursor-pointer transition-all aspect-square
+                          ${gitClientIconId === id
+                            ? 'bg-indigo-900/40 border-indigo-500 ring-1'
+                            : 'hover:bg-gray-800 hover:border-gray-700'}
+                        `}
+                      >
+                        <div
+                          className="w-6 h-6 text-gray-100 [&>svg]:w-full [&>svg]:h-full"
+                          dangerouslySetInnerHTML={{ __html: svg }}
+                        />
+
+                        {!['default', 'tower', 'gitlab'].includes(id) && (
+                          <button
+                            onClick={(e) => handleDeleteIcon(e, id)}
+                            className="absolute -top-1 -right-1 p-1 bg-red-900/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                            title="Delete Icon"
+                          >
+                            <Trash2 className="w-3 h-3 text-white" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <div
+                      onClick={handleAddIcon}
+                      className="flex flex-col items-center justify-center p-0 rounded-lg border border-dashed border-gray-800 hover:border-indigo-500/50 hover:bg-indigo-950/20 cursor-pointer transition-all aspect-square text-gray-500 hover:text-indigo-400 gap-1"
+                      title="Add Custom Icon (SVG)"
+                    >
+                      <Plus className="w-5 h-5" />
+                      <span className="text-[10px] font-medium">Add</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </TabsContent>
 
