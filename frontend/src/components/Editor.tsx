@@ -8,6 +8,7 @@
 import React, { useRef, useImperativeHandle, forwardRef, useEffect } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import MonacoEditor, { OnMount } from '@monaco-editor/react';
+import { conf, languageDef, languageID } from '../monaco/asciidoc';
 
 export interface EditorHandle {
   focus: () => void;
@@ -16,6 +17,8 @@ export interface EditorHandle {
   setValue: (text: string) => void;
   getValue: () => string;
   getSelection: () => string;
+  undo: () => void;
+  redo: () => void;
 }
 
 interface EditorProps {
@@ -83,12 +86,24 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ defaultValue, onChange, 
         return editor.getModel().getValueInRange(selection);
       }
       return "";
+    },
+    undo: () => {
+      editorRef.current?.trigger('api', 'undo', null);
+    },
+    redo: () => {
+      editorRef.current?.trigger('api', 'redo', null);
     }
   }));
 
   const handleEditorDidMount: OnMount = React.useCallback((editor, monaco) => {
     editorRef.current = editor;
+    editorRef.current = editor;
     monacoRef.current = monaco;
+
+    // Register AsciiDoc language
+    monaco.languages.register({ id: languageID });
+    monaco.languages.setMonarchTokensProvider(languageID, languageDef);
+    monaco.languages.setLanguageConfiguration(languageID, conf);
 
     // Define and apply Hack The Box theme
     monaco.editor.defineTheme('hack-the-box', {
@@ -108,6 +123,17 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ defaultValue, onChange, 
         { token: 'tag', foreground: 'FF8484' },
         { token: 'attribute.name', foreground: '5CB2FF' },
         { token: 'attribute.value', foreground: 'C5F467' },
+
+        // AsciiDoc specific
+        { token: 'keyword.header.h1', foreground: 'FF8484', fontStyle: 'bold' },
+        { token: 'keyword.header.h2', foreground: 'FFCC5C', fontStyle: 'bold' },
+        { token: 'keyword.header.h3', foreground: '5CB2FF', fontStyle: 'bold' },
+        { token: 'keyword.header', foreground: 'FF8484', fontStyle: 'bold' },
+        { token: 'keyword.list', foreground: '5CB2FF' },
+        { token: 'variable.attribute', foreground: '5CB2FF' },
+        { token: 'strong', fontStyle: 'bold', foreground: 'A4B1CD' },
+        { token: 'emphasis', fontStyle: 'italic', foreground: 'A4B1CD' },
+        { token: 'string.code', foreground: 'C5F467' },
       ],
       colors: {
         'editor.background': '#141d2b',
@@ -149,7 +175,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(({ defaultValue, onChange, 
 
       <MonacoEditor
         height="100%"
-        language="markdown"
+        language={languageID}
         theme="hack-the-box"
         defaultValue={defaultValue}
         onChange={handleEditorChange}
