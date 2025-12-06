@@ -111,7 +111,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   };
 
   return (
-    <div id="ndx-left-sidebar" className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 transition-all duration-300">
+    <div id="ndx-left-sidebar" className="w-full h-full bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 transition-all duration-300">
       {/* Tabs */}
       <div id="ndx-left-sidebar-tabs" className="h-6 flex border-b border-gray-800">
         <button id="ndx-left-sidebar-files-tab"

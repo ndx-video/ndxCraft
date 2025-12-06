@@ -57,7 +57,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose, currentConte
   };
 
   return (
-    <div id="ndx-ai-assistant-panel" className="w-96 bg-gray-900 border-l border-gray-800 flex flex-col shrink-0 h-full">
+    <div id="ndx-ai-assistant-panel" className="w-full h-full bg-gray-900 border-l border-gray-800 flex flex-col shrink-0">
       <div className="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-900">
         <h3 className="text-white font-semibold flex items-center gap-2 text-sm">
           <Sparkles className="text-indigo-400" size={16} />
